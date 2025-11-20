@@ -36,13 +36,62 @@ export default function ReportsPage() {
     };
 
     const handleExportCSV = () => {
-        // TODO: Implement CSV export
-        alert('CSV export functionality coming soon!');
+        if (!selectedTourId) return;
+        const selectedTour = tours.find(t => t.id === selectedTourId);
+        if (!selectedTour || !selectedTour.shows.length) {
+            alert('No data to export');
+            return;
+        }
+
+        import('xlsx').then(xlsx => {
+            const data = selectedTour.shows.map(show => ({
+                Show: show.name,
+                Date: format(new Date(show.date), 'yyyy-MM-dd'),
+                Venue: show.venue || '',
+                Revenue: 0, // Placeholder
+                ItemsSold: 0 // Placeholder
+            }));
+
+            const worksheet = xlsx.utils.json_to_sheet(data);
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, "Shows");
+            xlsx.writeFile(workbook, `${selectedTour.name.replace(/\s+/g, '_')}_Report.csv`);
+        });
     };
 
     const handleExportExcel = () => {
-        // TODO: Implement Excel export
-        alert('Excel export functionality coming soon!');
+        if (!selectedTourId) return;
+        const selectedTour = tours.find(t => t.id === selectedTourId);
+        if (!selectedTour || !selectedTour.shows.length) {
+            alert('No data to export');
+            return;
+        }
+
+        import('xlsx').then(xlsx => {
+            const showData = selectedTour.shows.map(show => ({
+                Show: show.name,
+                Date: format(new Date(show.date), 'yyyy-MM-dd'),
+                Venue: show.venue || '',
+                Revenue: 0, // Placeholder
+                ItemsSold: 0 // Placeholder
+            }));
+
+            const worksheet = xlsx.utils.json_to_sheet(showData);
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, "Shows");
+
+            // Add an overview sheet
+            const overviewData = [
+                { Metric: 'Tour Name', Value: selectedTour.name },
+                { Metric: 'Total Shows', Value: selectedTour.shows.length },
+                { Metric: 'Total Revenue', Value: 0 },
+                { Metric: 'Total Items Sold', Value: 0 }
+            ];
+            const overviewSheet = xlsx.utils.json_to_sheet(overviewData);
+            xlsx.utils.book_append_sheet(workbook, overviewSheet, "Overview");
+
+            xlsx.writeFile(workbook, `${selectedTour.name.replace(/\s+/g, '_')}_Report.xlsx`);
+        });
     };
 
     if (loading) {

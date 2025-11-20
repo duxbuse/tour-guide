@@ -1,26 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { auth0 } from '@/lib/auth0';
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { tourId: string } }
+    { params }: { params: Promise<{ tourId: string }> }
 ) {
     try {
-        // TODO: Add proper Auth0 authentication
-        let user = await db.user.findFirst();
+        const session = await auth0.getSession();
 
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: 'demo-user',
-                    email: 'demo@example.com',
-                    name: 'Demo User',
-                    role: 'MANAGER',
-                },
-            });
+        if (!session || !session.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { tourId } = params;
+        const user = await db.user.findUnique({
+            where: { auth0Id: session.user.sub }
+        });
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found in database' }, { status: 401 });
+        }
+
+        const { tourId } = await params;
 
         // Verify tour belongs to user
         const tour = await db.tour.findFirst({

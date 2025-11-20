@@ -1,19 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { auth0 } from '@/lib/auth0';
 
 export async function GET(request: NextRequest) {
     try {
-        // TODO: Add proper Auth0 authentication
-        let user = await db.user.findFirst();
+        const session = await auth0.getSession();
+
+        let auth0User = session?.user;
+
+        // Fallback to demo user for development
+        if (!auth0User) {
+            auth0User = {
+                sub: 'demo-user',
+                email: 'demo@example.com',
+                name: 'Demo User'
+            };
+        }
+
+        // Find or create user in DB
+        let user = await db.user.findUnique({
+            where: { auth0Id: auth0User.sub }
+        });
 
         if (!user) {
             user = await db.user.create({
                 data: {
-                    auth0Id: 'demo-user',
-                    email: 'demo@example.com',
-                    name: 'Demo User',
-                    role: 'MANAGER',
-                },
+                    auth0Id: auth0User.sub,
+                    email: auth0User.email || 'demo@example.com',
+                    name: auth0User.name || 'Demo User',
+                    role: 'MANAGER'
+                }
             });
         }
 
@@ -55,17 +71,32 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        // TODO: Add proper Auth0 authentication
-        let user = await db.user.findFirst();
+        const session = await auth0.getSession();
+
+        let auth0User = session?.user;
+
+        // Fallback to demo user for development
+        if (!auth0User) {
+            auth0User = {
+                sub: 'demo-user',
+                email: 'demo@example.com',
+                name: 'Demo User'
+            };
+        }
+
+        // Find or create user in DB
+        let user = await db.user.findUnique({
+            where: { auth0Id: auth0User.sub }
+        });
 
         if (!user) {
             user = await db.user.create({
                 data: {
-                    auth0Id: 'demo-user',
-                    email: 'demo@example.com',
-                    name: 'Demo User',
-                    role: 'MANAGER',
-                },
+                    auth0Id: auth0User.sub,
+                    email: auth0User.email || 'demo@example.com',
+                    name: auth0User.name || 'Demo User',
+                    role: 'MANAGER'
+                }
             });
         }
 

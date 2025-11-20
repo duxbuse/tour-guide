@@ -34,10 +34,11 @@ export default function InventoryPage() {
         name: '',
         description: '',
         imageUrl: '',
+        price: '',
     });
 
     const [variants, setVariants] = useState([
-        { size: 'S', type: '', price: '' },
+        { size: 'S', type: '' },
     ]);
 
     useEffect(() => {
@@ -91,8 +92,10 @@ export default function InventoryPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tourId: selectedTourId,
-                    ...newItem,
-                    variants: variants.filter(v => v.size && v.price),
+                    name: newItem.name,
+                    description: newItem.description,
+                    imageUrl: newItem.imageUrl,
+                    variants: variants.filter(v => v.size).map(v => ({ ...v, price: newItem.price })),
                 }),
             });
 
@@ -100,8 +103,8 @@ export default function InventoryPage() {
                 const item = await response.json();
                 setMerchItems([item, ...merchItems]);
                 setShowNewItemModal(false);
-                setNewItem({ name: '', description: '', imageUrl: '' });
-                setVariants([{ size: 'S', type: '', price: '' }]);
+                setNewItem({ name: '', description: '', imageUrl: '', price: '' });
+                setVariants([{ size: 'S', type: '' }]);
             }
         } catch (error) {
             console.error('Error creating merch item:', error);
@@ -111,7 +114,7 @@ export default function InventoryPage() {
     };
 
     const addVariant = () => {
-        setVariants([...variants, { size: '', type: '', price: '' }]);
+        setVariants([...variants, { size: '', type: '' }]);
     };
 
     const removeVariant = (index: number) => {
@@ -278,7 +281,23 @@ export default function InventoryPage() {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Variants</label>
+                                <label className="form-label">Price</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-input"
+                                    placeholder="e.g. 25.00"
+                                    value={newItem.price}
+                                    onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                                    required
+                                />
+                                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                    This price will apply to all variants
+                                </p>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Variants (Sizes/Types)</label>
                                 {variants.map((variant, index) => (
                                     <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                                         <input
@@ -298,16 +317,7 @@ export default function InventoryPage() {
                                             onChange={(e) => updateVariant(index, 'type', e.target.value)}
                                             style={{ flex: 1 }}
                                         />
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            className="form-input"
-                                            placeholder="Price"
-                                            value={variant.price}
-                                            onChange={(e) => updateVariant(index, 'price', e.target.value)}
-                                            required
-                                            style={{ flex: 1 }}
-                                        />
+
                                         {variants.length > 1 && (
                                             <button
                                                 type="button"
