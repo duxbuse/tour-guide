@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  auth0Id   String   @unique
+  email     String   @unique
+  name      String?
+  role      String   @default("SELLER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tours     Tour[]
+}
+
+model Tour {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime?
+  endDate   DateTime?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  managerId String
+  manager   User     @relation(fields: [managerId], references: [id])
+  
+  shows     Show[]
+  merchItems MerchItem[]
+}
+
+model Show {
+  id        String   @id @default(cuid())
+  name      String   // e.g. "London - O2 Arena"
+  date      DateTime
+  venue     String?
+  
+  ticketsSold Int?
+  totalTickets Int?
+  
+  cost      Float?
+  currency  String   @default("USD")
+  
+  tourId    String
+  tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  
+  inventoryRecords InventoryRecord[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MerchItem {
+  id        String   @id @default(cuid())
+  name      String
+  description String?
+  imageUrl  String?  // Vercel Blob URL
+  
+  tourId    String
+  tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  
+  variants  MerchVariant[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MerchVariant {
+  id        String   @id @default(cuid())
+  size      String   // e.g. "M", "L", "One Size"
+  type      String?  // e.g. "Mens", "Womens"
+  price     Float
+  
+  merchItemId String
+  merchItem   MerchItem @relation(fields: [merchItemId], references: [id], onDelete: Cascade)
+  
+  inventoryRecords InventoryRecord[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InventoryRecord {
+  id        String   @id @default(cuid())
+  
+  startCount Int     @default(0)
+  addedCount Int     @default(0)
+  endCount   Int?    // Null until counted
+  
+  soldCount  Int?    // Calculated: start + added - end
+  
+  showId    String
+  show      Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
+  
+  variantId String
+  variant   MerchVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([showId, variantId])
+}
