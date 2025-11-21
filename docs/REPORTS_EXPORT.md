@@ -7,7 +7,7 @@ Successfully implemented CSV and Excel export functionality for the Reports page
 
 ### 1. **CSV Export**
 - Exports show data in CSV format
-- Includes: Show name, Date, Venue, Revenue (placeholder), Items Sold (placeholder)
+- Includes: City, Date, Venue, Revenue (placeholder), Items Sold (placeholder)
 - File naming: `{TourName}_Report.csv`
 
 ### 2. **Excel Export**

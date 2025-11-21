@@ -40,7 +40,7 @@ export async function POST(
 
         if (!name || !date) {
             return NextResponse.json(
-                { error: 'Show name and date are required' },
+                { error: 'City and date are required' },
                 { status: 400 }
             );
         }

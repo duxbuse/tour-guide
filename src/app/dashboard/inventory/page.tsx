@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { auth0 } from '@/lib/auth0';
 
 interface MerchVariant {
     id: string;
@@ -33,6 +34,31 @@ export default function InventoryPage() {
     const [editingItem, setEditingItem] = useState<MerchItem | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    useEffect(() => {
+        // Get current user from auth service
+        const fetchUser = async () => {
+            const session = await auth0.getSession();
+            if (session?.user) {
+                setUser(session.user);
+            }
+        };
+        fetchUser();
+    }, []); // Remove dependency so it only runs once or add currentUserType to dependencies
+
+    // Check user role - Manager can delete/create, both Manager and Seller can edit quantities
+    const getUserRoles = (): string[] => {
+        if (!user) return [];
+        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
+        const standardRoles = (user.roles as string[]) || [];
+        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
+    };
+
+    const userRoles = getUserRoles();
+    const isManager = userRoles.includes('manager');
+    const canManageItems = isManager; // Only managers can create/delete
+    const canEditQuantities = isManager || userRoles.includes('seller'); // Both can edit quantities
 
     const [newItem, setNewItem] = useState({
         name: '',
@@ -247,13 +273,15 @@ export default function InventoryPage() {
                     <h1>Inventory</h1>
                     <p>Manage your merchandise items and variants</p>
                 </div>
-                <button
-                    className="btn btn-primary"
-                    onClick={() => setShowNewItemModal(true)}
-                    disabled={!selectedTourId}
-                >
-                    + New Item
-                </button>
+                {canManageItems && (
+                    <button
+                        className="btn btn-primary"
+                        onClick={() => setShowNewItemModal(true)}
+                        disabled={!selectedTourId}
+                    >
+                        + New Item
+                    </button>
+                )}
             </header>
 
             {/* Tour Selector */}
@@ -296,9 +324,11 @@ export default function InventoryPage() {
                 <div className="empty-state">
                     <h3>No merchandise items yet</h3>
                     <p>Add your first item to start tracking inventory for this tour.</p>
-                    <button className="btn btn-primary" onClick={() => setShowNewItemModal(true)} style={{ marginTop: '1rem' }}>
-                        Add Item
-                    </button>
+                    {canManageItems && (
+                        <button className="btn btn-primary" onClick={() => setShowNewItemModal(true)} style={{ marginTop: '1rem' }}>
+                            Add Item
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="merch-grid">
@@ -336,18 +366,22 @@ export default function InventoryPage() {
                                     ))}
                                 </div>
                                 <div className="merch-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <button
-                                        className="btn btn-secondary btn-small"
-                                        onClick={() => handleEditItem(item)}
-                                    >
-                                        Edit Quantities
-                                    </button>
-                                    <button
-                                        className="btn btn-danger btn-small"
-                                        onClick={() => handleDeleteItem(item.id)}
-                                    >
-                                        Delete
-                                    </button>
+                                    {canEditQuantities && (
+                                        <button
+                                            className="btn btn-secondary btn-small"
+                                            onClick={() => handleEditItem(item)}
+                                        >
+                                            Edit Quantities
+                                        </button>
+                                    )}
+                                    {canManageItems && (
+                                        <button
+                                            className="btn btn-danger btn-small"
+                                            onClick={() => handleDeleteItem(item.id)}
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

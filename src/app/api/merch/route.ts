@@ -55,11 +55,35 @@ export async function GET(request: NextRequest) {
         const merchItems = await db.merchItem.findMany({
             where: { tourId },
             include: {
-                variants: {
-                    orderBy: { size: 'asc' },
-                },
+                variants: true,
             },
             orderBy: { createdAt: 'desc' },
+        });
+
+        // Sort variants with proper size ordering
+        const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+        
+        merchItems.forEach(item => {
+            item.variants.sort((a, b) => {
+                // First sort by type
+                const typeA = a.type || '';
+                const typeB = b.type || '';
+                if (typeA !== typeB) {
+                    return typeA.localeCompare(typeB);
+                }
+                
+                // Then sort by size using proper order
+                const sizeIndexA = sizeOrder.indexOf(a.size.toUpperCase());
+                const sizeIndexB = sizeOrder.indexOf(b.size.toUpperCase());
+                
+                // If size found in order array, use that position
+                if (sizeIndexA !== -1 && sizeIndexB !== -1) {
+                    return sizeIndexA - sizeIndexB;
+                }
+                
+                // If one or both sizes not in array, fall back to alphabetical
+                return a.size.localeCompare(b.size);
+            });
         });
 
         return NextResponse.json(merchItems);
@@ -67,6 +91,13 @@ export async function GET(request: NextRequest) {
         console.error('Error fetching merch items:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
+}
+
+// Helper function to check user roles
+function getUserRoles(user: any): string[] { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
+    const standardRoles = (user.roles as string[]) || [];
+    return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
 }
 
 export async function POST(request: NextRequest) {
@@ -98,6 +129,14 @@ export async function POST(request: NextRequest) {
                     role: 'MANAGER'
                 }
             });
+        }
+
+        // Check if user has manager role for creating items
+        const userRoles = getUserRoles(auth0User);
+        const isManager = userRoles.includes('manager');
+
+        if (!isManager) {
+            return NextResponse.json({ error: 'Access denied. Manager role required to create items.' }, { status: 403 });
         }
 
         const body = await request.json();
@@ -180,6 +219,14 @@ export async function DELETE(request: NextRequest) {
             });
         }
 
+        // Check if user has manager role for deleting items
+        const userRoles = getUserRoles(auth0User);
+        const isManager = userRoles.includes('manager');
+
+        if (!isManager) {
+            return NextResponse.json({ error: 'Access denied. Manager role required to delete items.' }, { status: 403 });
+        }
+
         const { searchParams } = new URL(request.url);
         const merchItemId = searchParams.get('id');
 
@@ -244,6 +291,15 @@ export async function PUT(request: NextRequest) {
             });
         }
 
+        // Check if user has permission to edit quantities (manager or seller)
+        const userRoles = getUserRoles(auth0User);
+        const isManager = userRoles.includes('manager');
+        const isSeller = userRoles.includes('seller');
+
+        if (!isManager && !isSeller) {
+            return NextResponse.json({ error: 'Access denied. Manager or Seller role required to edit quantities.' }, { status: 403 });
+        }
+
         const body = await request.json();
         const { id, name, description, imageUrl, variants } = body;
 
@@ -303,11 +359,35 @@ export async function PUT(request: NextRequest) {
         const finalItem = await db.merchItem.findUnique({
             where: { id },
             include: {
-                variants: {
-                    orderBy: { size: 'asc' },
-                },
+                variants: true,
             },
         });
+
+        if (finalItem) {
+            // Sort variants with proper size ordering
+            const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+            
+            finalItem.variants.sort((a, b) => {
+                // First sort by type
+                const typeA = a.type || '';
+                const typeB = b.type || '';
+                if (typeA !== typeB) {
+                    return typeA.localeCompare(typeB);
+                }
+                
+                // Then sort by size using proper order
+                const sizeIndexA = sizeOrder.indexOf(a.size.toUpperCase());
+                const sizeIndexB = sizeOrder.indexOf(b.size.toUpperCase());
+                
+                // If size found in order array, use that position
+                if (sizeIndexA !== -1 && sizeIndexB !== -1) {
+                    return sizeIndexA - sizeIndexB;
+                }
+                
+                // If one or both sizes not in array, fall back to alphabetical
+                return a.size.localeCompare(b.size);
+            });
+        }
 
         return NextResponse.json(finalItem);
     } catch (error) {
