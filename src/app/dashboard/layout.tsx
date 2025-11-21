@@ -12,22 +12,19 @@ export default function DashboardLayout({
 }) {
     const pathname = usePathname();
 
-    const navItems = [
-        { href: '/dashboard', label: 'Overview' },
-        { href: '/dashboard/tours', label: 'Tours' },
-        { href: '/dashboard/inventory', label: 'Inventory' },
-        { href: '/dashboard/reports', label: 'Reports' },
-        { href: '/dashboard/settings', label: 'Settings' },
-    ];
+    // Start with a consistent default to avoid hydration mismatch
+    const [currentUserType, setCurrentUserTypeState] = useState<'manager' | 'seller'>('manager');
+    const [mounted, setMounted] = useState(false);
 
-    const [currentUserType, setCurrentUserTypeState] = useState<'manager' | 'seller'>(() => {
-        // Initialize from localStorage on first render
-        if (typeof window !== 'undefined') {
-            const stored = localStorage.getItem('tour-guide-user-type');
-            return stored === 'seller' ? 'seller' : 'manager';
+    // Update user type from localStorage after component mounts (client-side only)
+    useEffect(() => {
+        const stored = localStorage.getItem('tour-guide-user-type');
+        if (stored === 'seller') {
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            setCurrentUserTypeState('seller'); // Legitimate case: syncing with external localStorage state
         }
-        return 'manager';
-    });
+        setMounted(true);
+    }, []);
 
     const users = {
         manager: {
@@ -43,6 +40,21 @@ export default function DashboardLayout({
     };
 
     const user = users[currentUserType];
+    const isManager = user?.roles.includes('manager');
+
+    // Filter navigation items based on user role - only apply filtering on client side
+    const allNavItems = [
+        { href: '/dashboard', label: 'Overview' },
+        { href: '/dashboard/tours', label: 'Tours' },
+        { href: '/dashboard/inventory', label: 'Inventory' },
+        { href: '/dashboard/reports', label: 'Reports', managerOnly: true },
+    ];
+
+    // Only filter after component is mounted to prevent hydration mismatch
+    const navItems = mounted
+        ? allNavItems.filter(item => !item.managerOnly || isManager)
+        : allNavItems; // Show all during SSR, filter on client
+
     const [loading] = useState(false);
 
     const handleUserSwitch = (userType: 'manager' | 'seller') => {

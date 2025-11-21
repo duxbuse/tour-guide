@@ -8,12 +8,12 @@ export async function GET(request: NextRequest) {
 
         let auth0User = session?.user;
 
-        // Fallback to demo user for development
+        // Fallback to manager user for development
         if (!auth0User) {
             auth0User = {
-                sub: 'demo-user',
-                email: 'demo@example.com',
-                name: 'Demo User',
+                sub: 'auth0|691f989d2bc713054fec2340',
+                email: 'manager@test.com',
+                name: 'Tour Manager',
                 'https://tour-guide.app/roles': ['Manager']
             };
         }
@@ -22,20 +22,49 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Find or create user in DB
+        // Find user in DB - try auth0Id first, then email
         let user = await db.user.findUnique({
             where: { auth0Id: auth0User.sub }
         });
 
         if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
+            user = await db.user.findUnique({
+                where: { email: auth0User.email || 'manager@test.com' }
             });
+            
+            // If found by email, update the auth0Id
+            if (user) {
+                user = await db.user.update({
+                    where: { id: user.id },
+                    data: { auth0Id: auth0User.sub }
+                });
+            } else {
+                // Only create if truly not found
+                try {
+                    user = await db.user.create({
+                        data: {
+                            auth0Id: auth0User.sub,
+                            email: auth0User.email || 'manager@test.com',
+                            name: auth0User.name || 'Tour Manager',
+                            role: 'MANAGER'
+                        }
+                    });
+                } catch (e) {
+                    // If unique constraint fails, try finding again
+                    if (e && typeof e === 'object' && 'code' in e && e.code === 'P2002') {
+                        user = await db.user.findFirst({
+                            where: {
+                                OR: [
+                                    { auth0Id: auth0User.sub },
+                                    { email: auth0User.email || 'manager@test.com' }
+                                ]
+                            }
+                        });
+                    } else {
+                        throw e;
+                    }
+                }
+            }
         }
 
         if (!user) {
@@ -88,12 +117,12 @@ export async function POST(request: NextRequest) {
 
         let auth0User = session?.user;
 
-        // Fallback to demo user for development
+        // Fallback to manager user for development
         if (!auth0User) {
             auth0User = {
-                sub: 'demo-user',
-                email: 'demo@example.com',
-                name: 'Demo User',
+                sub: 'auth0|691f989d2bc713054fec2340',
+                email: 'manager@test.com',
+                name: 'Tour Manager',
                 'https://tour-guide.app/roles': ['Manager']
             };
         }
@@ -108,14 +137,32 @@ export async function POST(request: NextRequest) {
         });
 
         if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
+            // For manager user fallback, try to find by email first to avoid conflicts
+            if (auth0User.sub === 'auth0|691f989d2bc713054fec2340') {
+                user = await db.user.findUnique({
+                    where: { email: 'manager@test.com' }
+                });
+                
+                // If found by email, update any auth0Id mismatches
+                if (user && user.auth0Id !== auth0User.sub) {
+                    user = await db.user.update({
+                        where: { id: user.id },
+                        data: { auth0Id: auth0User.sub }
+                    });
                 }
-            });
+            }
+            
+            // If still no user found, create a new one
+            if (!user) {
+                user = await db.user.create({
+                    data: {
+                        auth0Id: auth0User.sub,
+                        email: auth0User.email || 'manager@test.com',
+                        name: auth0User.name || 'Tour Manager',
+                        role: 'MANAGER'
+                    }
+                });
+            }
         }
 
         const body = await request.json();
@@ -179,14 +226,32 @@ export async function PUT(request: NextRequest) {
         });
 
         if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
+            // For demo user, try to find by email first to avoid conflicts
+            if (auth0User.sub === 'demo-user') {
+                user = await db.user.findUnique({
+                    where: { email: 'demo@example.com' }
+                });
+                
+                // If found by email, update the auth0Id to match
+                if (user) {
+                    user = await db.user.update({
+                        where: { id: user.id },
+                        data: { auth0Id: 'demo-user' }
+                    });
                 }
-            });
+            }
+            
+            // If still no user found, create a new one
+            if (!user) {
+                user = await db.user.create({
+                    data: {
+                        auth0Id: auth0User.sub,
+                        email: auth0User.email || 'demo@example.com',
+                        name: auth0User.name || 'Demo User',
+                        role: 'MANAGER'
+                    }
+                });
+            }
         }
 
         const body = await request.json();
@@ -264,14 +329,32 @@ export async function DELETE(request: NextRequest) {
         });
 
         if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
+            // For demo user, try to find by email first to avoid conflicts
+            if (auth0User.sub === 'demo-user') {
+                user = await db.user.findUnique({
+                    where: { email: 'demo@example.com' }
+                });
+                
+                // If found by email, update the auth0Id to match
+                if (user) {
+                    user = await db.user.update({
+                        where: { id: user.id },
+                        data: { auth0Id: 'demo-user' }
+                    });
                 }
-            });
+            }
+            
+            // If still no user found, create a new one
+            if (!user) {
+                user = await db.user.create({
+                    data: {
+                        auth0Id: auth0User.sub,
+                        email: auth0User.email || 'demo@example.com',
+                        name: auth0User.name || 'Demo User',
+                        role: 'MANAGER'
+                    }
+                });
+            }
         }
 
         const { searchParams } = new URL(request.url);

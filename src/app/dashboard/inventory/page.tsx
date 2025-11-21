@@ -19,9 +19,39 @@ interface MerchItem {
     variants: MerchVariant[];
 }
 
+interface Show {
+    id: string;
+    name: string;
+    date: string;
+    venue: string | null;
+}
+
 interface Tour {
     id: string;
     name: string;
+    shows: Show[];
+}
+
+interface InventoryRecord {
+    id: string;
+    startCount: number;
+    addedCount: number;
+    endCount: number | null;
+    soldCount: number | null;
+    showId: string;
+    variantId: string;
+    show: Show;
+    variant: {
+        id: string;
+        size: string;
+        type: string | null;
+        price: number;
+        quantity: number;
+        merchItem: {
+            id: string;
+            name: string;
+        };
+    };
 }
 
 export default function InventoryPage() {
@@ -35,6 +65,9 @@ export default function InventoryPage() {
     const [showEditModal, setShowEditModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [selectedShowId, setSelectedShowId] = useState<string | null>(null);
+    const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
+    const [showInventoryModal, setShowInventoryModal] = useState(false);
 
     useEffect(() => {
         // Get current user from auth service
@@ -78,6 +111,7 @@ export default function InventoryPage() {
     useEffect(() => {
         if (selectedTourId) {
             fetchMerchItems(selectedTourId);
+            fetchInventoryRecords(selectedTourId);
         }
     }, [selectedTourId]);
 
@@ -95,6 +129,18 @@ export default function InventoryPage() {
             console.error('Error fetching tours:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchInventoryRecords = async (tourId: string) => {
+        try {
+            const response = await fetch(`/api/inventory?tourId=${tourId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setInventoryRecords(data);
+            }
+        } catch (error) {
+            console.error('Error fetching inventory records:', error);
         }
     };
 
@@ -205,7 +251,45 @@ export default function InventoryPage() {
 
     const handleEditItem = (item: MerchItem) => {
         setEditingItem(item);
+        if (!canManageItems && tours.find(t => t.id === selectedTourId)?.shows?.length) {
+            // Sellers need to select a show for inventory tracking
+            setShowInventoryModal(true);
+        } else {
+            // Managers can edit quantities directly
+            setShowEditModal(true);
+        }
+    };
+
+    const handleInventoryForShow = (showId: string) => {
+        setSelectedShowId(showId);
+        setShowInventoryModal(false);
         setShowEditModal(true);
+    };
+
+    const handleUpdateInventoryRecord = async (variantId: string, counts: { startCount?: number, endCount?: number }) => {
+        if (!selectedShowId) return;
+
+        try {
+            const response = await fetch('/api/inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    showId: selectedShowId,
+                    variantId,
+                    addedCount: 0, // Not used anymore, set to 0
+                    ...counts,
+                }),
+            });
+
+            if (response.ok) {
+                // Refresh inventory records
+                if (selectedTourId) {
+                    fetchInventoryRecords(selectedTourId);
+                }
+            }
+        } catch (error) {
+            console.error('Error updating inventory record:', error);
+        }
     };
 
     const handleUpdateQuantities = async (itemId: string, updatedVariants: MerchVariant[]) => {
@@ -230,6 +314,76 @@ export default function InventoryPage() {
         } catch (error) {
             console.error('Error updating quantities:', error);
         }
+    };
+
+    const handleExportInventory = async () => {
+        if (!selectedTourId || merchItems.length === 0) return;
+
+        const selectedTour = tours.find(t => t.id === selectedTourId);
+        if (!selectedTour) return;
+
+        import('xlsx').then(xlsx => {
+            // Create main inventory sheet for sellers
+            const inventoryData = merchItems.flatMap(item =>
+                item.variants.map(variant => {
+                    // Get the most recent inventory count for this variant
+                    const variantRecords = inventoryRecords.filter(r => r.variantId === variant.id);
+                    let currentCount = variant.quantity;
+                    let lastShowDate = 'Initial Stock';
+                    
+                    if (variantRecords.length > 0) {
+                        const sortedRecords = variantRecords.sort((a, b) =>
+                            new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
+                        );
+                        const mostRecentRecord = sortedRecords[0];
+                        currentCount = mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? variant.quantity;
+                        lastShowDate = new Date(mostRecentRecord.show.date).toLocaleDateString();
+                    }
+
+                    return {
+                        Item: item.name,
+                        Variant: `${variant.type ? variant.type + ' - ' : ''}${variant.size}`,
+                        'Current Count': currentCount,
+                        'Unit Price': `$${variant.price.toFixed(2)}`,
+                        'Total Value': `$${(currentCount * variant.price).toFixed(2)}`,
+                        'Last Updated': lastShowDate,
+                        'Low Stock': currentCount < 5 ? 'YES' : 'NO'
+                    };
+                })
+            );
+
+            const worksheet = xlsx.utils.json_to_sheet(inventoryData);
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, "Current_Inventory");
+
+            // Add a separate show checklist sheet
+            const showData = selectedTour.shows.map(show => ({
+                Show: show.name,
+                Date: new Date(show.date).toLocaleDateString(),
+                Venue: show.venue || '',
+                'Start Count Completed': '',
+                'End Count Completed': '',
+                'Notes': ''
+            }));
+
+            const showSheet = xlsx.utils.json_to_sheet(showData);
+            xlsx.utils.book_append_sheet(workbook, showSheet, "Show_Checklist");
+
+            // Add summary sheet
+            const summaryData = [
+                { Metric: 'Tour Name', Value: selectedTour.name },
+                { Metric: 'Total Items', Value: merchItems.length },
+                { Metric: 'Total Variants', Value: merchItems.reduce((sum, item) => sum + item.variants.length, 0) },
+                { Metric: 'Total Inventory Value', Value: `$${inventoryData.reduce((sum, row) => sum + parseFloat(row['Total Value'].replace('$', '')), 0).toFixed(2)}` },
+                { Metric: 'Low Stock Items', Value: inventoryData.filter(row => row['Low Stock'] === 'YES').length },
+                { Metric: 'Export Date', Value: new Date().toLocaleString() }
+            ];
+
+            const summarySheet = xlsx.utils.json_to_sheet(summaryData);
+            xlsx.utils.book_append_sheet(workbook, summarySheet, "Summary");
+
+            xlsx.writeFile(workbook, `${selectedTour.name.replace(/\s+/g, '_')}_Inventory_${new Date().toISOString().split('T')[0]}.xlsx`);
+        });
     };
 
     const addVariant = () => {
@@ -273,15 +427,26 @@ export default function InventoryPage() {
                     <h1>Inventory</h1>
                     <p>Manage your merchandise items and variants</p>
                 </div>
-                {canManageItems && (
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => setShowNewItemModal(true)}
-                        disabled={!selectedTourId}
-                    >
-                        + New Item
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {merchItems.length > 0 && (
+                        <button
+                            className="btn btn-secondary"
+                            onClick={handleExportInventory}
+                            disabled={!selectedTourId}
+                        >
+                            📊 Export Excel
+                        </button>
+                    )}
+                    {canManageItems && (
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => setShowNewItemModal(true)}
+                            disabled={!selectedTourId}
+                        >
+                            + New Item
+                        </button>
+                    )}
+                </div>
             </header>
 
             {/* Tour Selector */}
@@ -312,7 +477,21 @@ export default function InventoryPage() {
                 <div className="inventory-stat">
                     <div className="inventory-stat-value">
                         ${merchItems.reduce((sum, item) =>
-                            sum + item.variants.reduce((vSum, v) => vSum + (v.price * v.quantity), 0), 0
+                            sum + item.variants.reduce((vSum, v) => {
+                                // Get the most recent inventory count for this variant
+                                const variantRecords = inventoryRecords.filter(r => r.variantId === v.id);
+                                let latestCount = v.quantity;
+                                
+                                if (variantRecords.length > 0) {
+                                    const sortedRecords = variantRecords.sort((a, b) =>
+                                        new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
+                                    );
+                                    const mostRecentRecord = sortedRecords[0];
+                                    latestCount = mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? v.quantity;
+                                }
+                                
+                                return vSum + (v.price * latestCount);
+                            }, 0), 0
                         ).toFixed(2)}
                     </div>
                     <div className="inventory-stat-label">Total Value</div>
@@ -356,14 +535,32 @@ export default function InventoryPage() {
                                     ${item.variants[0]?.price.toFixed(2)}
                                 </div>
                                 <div className="variant-list">
-                                    {item.variants.map((variant) => (
-                                        <div key={variant.id} className="variant-item">
-                                            <span className="variant-name">
-                                                {variant.type ? `${variant.type} - ` : ''}{variant.size}
-                                            </span>
-                                            <span className="variant-quantity">Qty: {variant.quantity}</span>
-                                        </div>
-                                    ))}
+                                    {item.variants.map((variant) => {
+                                        // Get the most recent inventory count for this variant
+                                        const getLatestCount = (): number => {
+                                            const variantRecords = inventoryRecords.filter(r => r.variantId === variant.id);
+                                            if (variantRecords.length === 0) return variant.quantity;
+
+                                            // Sort by show date (most recent first)
+                                            const sortedRecords = variantRecords.sort((a, b) =>
+                                                new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
+                                            );
+
+                                            const mostRecentRecord = sortedRecords[0];
+                                            
+                                            // Use end count if available, otherwise start count, otherwise base quantity
+                                            return mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? variant.quantity;
+                                        };
+
+                                        return (
+                                            <div key={variant.id} className="variant-item">
+                                                <span className="variant-name">
+                                                    {variant.type ? `${variant.type} - ` : ''}{variant.size}
+                                                </span>
+                                                <span className="variant-quantity">Qty: {getLatestCount()}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                                 <div className="merch-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     {canEditQuantities && (
@@ -386,6 +583,81 @@ export default function InventoryPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Manager View - Show Inventory Records */}
+            {isManager && inventoryRecords.length > 0 && (
+                <div style={{ marginTop: '3rem' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
+                        Show Inventory Records
+                    </h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        {tours.find(t => t.id === selectedTourId)?.shows.map((show) => {
+                            const showRecords = inventoryRecords.filter(r => r.showId === show.id);
+                            if (showRecords.length === 0) return null;
+
+                            return (
+                                <div key={show.id} className="card">
+                                    <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--accent-primary)' }}>
+                                        {show.name} - {new Date(show.date).toLocaleDateString()}
+                                    </h3>
+                                    {show.venue && (
+                                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                                            {show.venue}
+                                        </div>
+                                    )}
+                                    <div className="table-container">
+                                        <table className="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Item</th>
+                                                    <th>Variant</th>
+                                                    <th>Start Count</th>
+                                                    <th>End Count</th>
+                                                    <th>Sold</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {showRecords.map((record) => (
+                                                    <tr key={record.id}>
+                                                        <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
+                                                            {record.variant.merchItem.name}
+                                                        </td>
+                                                        <td>
+                                                            {record.variant.type ? `${record.variant.type} - ` : ''}{record.variant.size}
+                                                        </td>
+                                                        <td>{record.startCount}</td>
+                                                        <td>
+                                                            {record.endCount !== null ? record.endCount : (
+                                                                <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                                                    Not counted
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            {record.soldCount !== null ? (
+                                                                <span style={{
+                                                                    color: 'var(--accent-gold)',
+                                                                    fontWeight: 'bold'
+                                                                }}>
+                                                                    {record.soldCount}
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                                                    Pending
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -524,52 +796,293 @@ export default function InventoryPage() {
             {/* Edit Item Modal */}
             {showEditModal && editingItem && (
                 <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                         <div className="modal-header">
-                            <h2>Edit Quantities - {editingItem.name}</h2>
+                            <h2>
+                                {selectedShowId ? 'Show Inventory Tracking' : 'Edit Quantities'} - {editingItem.name}
+                            </h2>
                             <button className="close-btn" onClick={() => setShowEditModal(false)}>×</button>
                         </div>
                         <div style={{ padding: '1.5rem' }}>
-                            <div className="form-group">
-                                <label className="form-label">Update Quantities</label>
-                                {editingItem.variants.map((variant, index) => (
-                                    <div key={variant.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--background-secondary)', borderRadius: '8px' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <strong>{variant.type ? `${variant.type} - ` : ''}{variant.size}</strong>
-                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                                ${variant.price.toFixed(2)}
-                                            </div>
-                                        </div>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            className="form-input"
-                                            placeholder="Quantity"
-                                            defaultValue={variant.quantity}
-                                            onChange={(e) => {
-                                                const updatedVariants = [...editingItem.variants];
-                                                updatedVariants[index] = { ...updatedVariants[index], quantity: parseInt(e.target.value) || 0 };
-                                                setEditingItem({ ...editingItem, variants: updatedVariants });
-                                            }}
-                                            style={{ width: '100px' }}
-                                        />
+                            {selectedShowId && (
+                                <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                                    <strong>Show: </strong>
+                                    {tours.find(t => t.id === selectedTourId)?.shows.find(s => s.id === selectedShowId)?.name}
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                        {(() => {
+                                            const show = tours.find(t => t.id === selectedTourId)?.shows.find(s => s.id === selectedShowId);
+                                            return show?.date ? new Date(show.date).toLocaleDateString() : '';
+                                        })()}
                                     </div>
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label className="form-label">
+                                    {selectedShowId ? 'Inventory Counts' : 'Update Quantities'}
+                                </label>
+                                {editingItem.variants.map((variant, index) => {
+                                    const existingRecord = inventoryRecords.find(r =>
+                                        r.variantId === variant.id && r.showId === selectedShowId
+                                    );
+
+                                    // Calculate smart default start count
+                                    const getDefaultStartCount = (): number => {
+                                        if (existingRecord?.startCount !== undefined) {
+                                            return existingRecord.startCount;
+                                        }
+
+                                        // Find previous shows for this tour, sorted by date
+                                        const currentTour = tours.find(t => t.id === selectedTourId);
+                                        const selectedShow = currentTour?.shows.find(s => s.id === selectedShowId);
+                                        
+                                        if (!currentTour || !selectedShow) return variant.quantity;
+
+                                        const previousShows = currentTour.shows
+                                            .filter(s => new Date(s.date) < new Date(selectedShow.date))
+                                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                                        // Look for the most recent previous show with an end count for this variant
+                                        for (const prevShow of previousShows) {
+                                            const prevRecord = inventoryRecords.find(r =>
+                                                r.variantId === variant.id && r.showId === prevShow.id && r.endCount !== null
+                                            );
+                                            if (prevRecord && prevRecord.endCount !== null) {
+                                                return prevRecord.endCount;
+                                            }
+                                        }
+
+                                        // No previous show or no end count found, use current tracked inventory
+                                        return variant.quantity;
+                                    };
+
+                                    const defaultStartCount = getDefaultStartCount();
+
+                                    return (
+                                        <div key={variant.id} style={{
+                                            marginBottom: '1.5rem',
+                                            padding: '1rem',
+                                            backgroundColor: 'var(--bg-secondary)',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-subtle)'
+                                        }}>
+                                            <div style={{ marginBottom: '1rem' }}>
+                                                <strong>{variant.type ? `${variant.type} - ` : ''}{variant.size}</strong>
+                                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                                    ${variant.price.toFixed(2)} • Available: {variant.quantity}
+                                                </div>
+                                            </div>
+
+                                            {selectedShowId ? (
+                                                // Simplified show-specific inventory tracking for sellers
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+                                                    <div>
+                                                        <label style={{
+                                                            fontSize: '0.875rem',
+                                                            color: 'var(--text-primary)',
+                                                            marginBottom: '0.5rem',
+                                                            display: 'block'
+                                                        }}>
+                                                            Start Count
+                                                        </label>
+                                                        <p style={{
+                                                            fontSize: '0.75rem',
+                                                            color: 'var(--text-secondary)',
+                                                            marginBottom: '0.5rem'
+                                                        }}>
+                                                            Count before show
+                                                        </p>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="form-input"
+                                                            value={existingRecord?.startCount !== undefined && existingRecord?.startCount !== null
+                                                                ? existingRecord.startCount
+                                                                : defaultStartCount}
+                                                            onChange={(e) => {
+                                                                handleUpdateInventoryRecord(variant.id, {
+                                                                    startCount: parseInt(e.target.value) || 0
+                                                                });
+                                                            }}
+                                                            style={{ fontSize: '0.875rem', padding: '0.75rem' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{
+                                                            fontSize: '0.875rem',
+                                                            color: 'var(--text-primary)',
+                                                            marginBottom: '0.5rem',
+                                                            display: 'block'
+                                                        }}>
+                                                            End Count
+                                                        </label>
+                                                        <p style={{
+                                                            fontSize: '0.75rem',
+                                                            color: 'var(--text-secondary)',
+                                                            marginBottom: '0.5rem'
+                                                        }}>
+                                                            Count after show
+                                                        </p>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="form-input"
+                                                            value={existingRecord?.endCount !== undefined && existingRecord?.endCount !== null
+                                                                ? existingRecord.endCount
+                                                                : ''}
+                                                            onChange={(e) => {
+                                                                handleUpdateInventoryRecord(variant.id, {
+                                                                    endCount: parseInt(e.target.value) || 0
+                                                                });
+                                                            }}
+                                                            style={{ fontSize: '0.875rem', padding: '0.75rem' }}
+                                                        />
+                                                    </div>
+                                                    
+                                                    {/* Calculate and display sold count */}
+                                                    {(() => {
+                                                        const startCount = existingRecord?.startCount;
+                                                        const endCount = existingRecord?.endCount;
+                                                        
+                                                        // Only show if we have both counts
+                                                        if (startCount !== null && startCount !== undefined &&
+                                                            endCount !== null && endCount !== undefined) {
+                                                            const calculatedSold = startCount - endCount;
+                                                            return (
+                                                                <div style={{
+                                                                    gridColumn: 'span 2',
+                                                                    marginTop: '1rem',
+                                                                    textAlign: 'center',
+                                                                    padding: '1rem',
+                                                                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                                                                    borderRadius: '8px'
+                                                                }}>
+                                                                    <span style={{
+                                                                        fontSize: '1rem',
+                                                                        color: 'var(--accent-gold)',
+                                                                        fontWeight: 'bold'
+                                                                    }}>
+                                                                        Items Sold: {calculatedSold}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
+                                            ) : (
+                                                // General quantity editing for managers
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    className="form-input"
+                                                    placeholder="Quantity"
+                                                    defaultValue={variant.quantity}
+                                                    onChange={(e) => {
+                                                        const updatedVariants = [...editingItem.variants];
+                                                        updatedVariants[index] = { ...updatedVariants[index], quantity: parseInt(e.target.value) || 0 };
+                                                        setEditingItem({ ...editingItem, variants: updatedVariants });
+                                                    }}
+                                                    style={{ width: '100px' }}
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowEditModal(false);
+                                        setSelectedShowId(null);
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                {!selectedShowId && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={() => handleUpdateQuantities(editingItem.id, editingItem.variants)}
+                                    >
+                                        Update Quantities
+                                    </button>
+                                )}
+                                {selectedShowId && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={() => {
+                                            setShowEditModal(false);
+                                            setSelectedShowId(null);
+                                        }}
+                                    >
+                                        Done
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Show Selection Modal for Sellers */}
+            {showInventoryModal && editingItem && (
+                <div className="modal-overlay" onClick={() => setShowInventoryModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <div className="modal-header">
+                            <h2>Select Show - {editingItem.name}</h2>
+                            <button className="close-btn" onClick={() => setShowInventoryModal(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '1.5rem' }}>
+                            <div className="form-group">
+                                <label className="form-label">Choose the show to track inventory for:</label>
+                                {tours.find(t => t.id === selectedTourId)?.shows.map((show) => (
+                                    <button
+                                        key={show.id}
+                                        onClick={() => handleInventoryForShow(show.id)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '1rem',
+                                            marginBottom: '0.5rem',
+                                            background: 'var(--bg-secondary)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: 'var(--radius-md)',
+                                            color: 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                                            e.currentTarget.style.background = 'var(--bg-secondary)';
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 'bold' }}>{show.name}</div>
+                                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                            {new Date(show.date).toLocaleDateString()}
+                                        </div>
+                                        {show.venue && (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                {show.venue}
+                                            </div>
+                                        )}
+                                    </button>
                                 ))}
                             </div>
                             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                                 <button
                                     type="button"
                                     className="btn btn-secondary"
-                                    onClick={() => setShowEditModal(false)}
+                                    onClick={() => setShowInventoryModal(false)}
                                 >
                                     Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    onClick={() => handleUpdateQuantities(editingItem.id, editingItem.variants)}
-                                >
-                                    Update Quantities
                                 </button>
                             </div>
                         </div>
