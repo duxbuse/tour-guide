@@ -26,7 +26,7 @@ async function main() {
       }
     });
 
-    const seller = await prisma.user.create({
+    await prisma.user.create({
       data: {
         auth0Id: 'auth0|691f98c8b7368a8df0744c61',
         email: 'seller@test.com',

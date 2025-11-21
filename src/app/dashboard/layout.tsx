@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { setUserType, getCurrentUserType } from "@/lib/auth0";
+import { setUserType } from "@/lib/auth0";
 
 export default function DashboardLayout({
     children,
@@ -12,18 +12,21 @@ export default function DashboardLayout({
 }) {
     const pathname = usePathname();
 
-    // Start with a consistent default to avoid hydration mismatch
-    const [currentUserType, setCurrentUserTypeState] = useState<'manager' | 'seller'>('manager');
-    const [mounted, setMounted] = useState(false);
-
-    // Update user type from localStorage after component mounts (client-side only)
-    useEffect(() => {
-        const stored = localStorage.getItem('tour-guide-user-type');
-        if (stored === 'seller') {
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            setCurrentUserTypeState('seller'); // Legitimate case: syncing with external localStorage state
+    // Initialize state with lazy initialization to avoid hydration issues
+    const [currentUserType, setCurrentUserTypeState] = useState<'manager' | 'seller'>(() => {
+        // Only check localStorage on client side
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('tour-guide-user-type');
+            return stored === 'seller' ? 'seller' : 'manager';
         }
-        setMounted(true);
+        return 'manager';
+    });
+    const [mounted, setMounted] = useState(() => false);
+
+    // Mark as mounted for client-side only features
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setMounted(true); // This is the standard pattern for client-side mounting detection
     }, []);
 
     const users = {

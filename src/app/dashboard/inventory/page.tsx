@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { auth0 } from '@/lib/auth0';
 
 interface MerchVariant {
@@ -106,6 +107,7 @@ export default function InventoryPage() {
 
     useEffect(() => {
         fetchTours();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -515,7 +517,13 @@ export default function InventoryPage() {
                         <div key={item.id} className="merch-card">
                             <div className="merch-image">
                                 {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <Image
+                                        src={item.imageUrl}
+                                        alt={item.name}
+                                        width={200}
+                                        height={200}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
                                 ) : (
                                     '🎸'
                                 )}

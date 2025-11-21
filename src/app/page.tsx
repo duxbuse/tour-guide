@@ -7,24 +7,29 @@ export default function Home() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: '80vh',
+      minHeight: '100vh',
       padding: '2rem',
       textAlign: 'center',
-      background: 'linear-gradient(to bottom, #ffffff, #f3f4f6)'
+      background: 'radial-gradient(circle at top right, rgba(139, 92, 246, 0.1), transparent 40%), radial-gradient(circle at bottom left, rgba(236, 72, 153, 0.1), transparent 40%)'
     }}>
       <h1 style={{
         fontSize: '4rem',
-        fontWeight: '800',
+        fontWeight: '700',
         marginBottom: '1.5rem',
-        letterSpacing: '-0.025em',
-        lineHeight: '1.1'
+        letterSpacing: '-0.03em',
+        lineHeight: '1.2',
+        background: 'linear-gradient(135deg, #ffffff 0%, #a5a5a5 50%, var(--accent-primary) 100%)',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        textShadow: '0 0 30px var(--glow-purple)'
       }}>
         Tour Guide
       </h1>
 
       <p style={{
         fontSize: '1.5rem',
-        color: '#4b5563',
+        color: 'var(--text-secondary)',
         maxWidth: '600px',
         marginBottom: '3rem',
         lineHeight: '1.5'
@@ -32,36 +37,25 @@ export default function Home() {
         The ultimate tool for band tour managers. Track merchandise, manage inventory, and monitor sales across every show.
       </p>
 
-      <div style={{ display: 'flex', gap: '1rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/api/auth/login"
+          className="btn btn-primary animate-pulse-glow"
           style={{
-            padding: '1rem 2rem',
-            backgroundColor: 'black',
-            color: 'white',
-            borderRadius: '0.5rem',
-            textDecoration: 'none',
-            fontWeight: '600',
-            fontSize: '1.125rem',
-            transition: 'opacity 0.2s'
+            textDecoration: 'none'
           }}
         >
           Get Started
         </a>
         <Link
-          href="/about"
+          href="/dashboard"
+          className="btn btn-secondary"
           style={{
-            padding: '1rem 2rem',
-            backgroundColor: 'white',
-            color: 'black',
-            border: '1px solid #e5e7eb',
-            borderRadius: '0.5rem',
-            textDecoration: 'none',
-            fontWeight: '600',
-            fontSize: '1.125rem'
+            textDecoration: 'none'
           }}
         >
-          Learn More
+          View Demo
         </Link>
       </div>
 
@@ -69,7 +63,7 @@ export default function Home() {
         marginTop: '5rem',
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '2rem',
+        gap: 'var(--spacing-md)',
         width: '100%',
         maxWidth: '1200px'
       }}>
@@ -92,15 +86,22 @@ export default function Home() {
 
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
-    <div style={{
-      padding: '2rem',
-      backgroundColor: 'white',
-      borderRadius: '1rem',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-      textAlign: 'left'
-    }}>
-      <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>{title}</h3>
-      <p style={{ color: '#6b7280', lineHeight: '1.6' }}>{description}</p>
+    <div className="card animate-fade-in delay-200">
+      <h3 style={{
+        fontSize: '1.25rem',
+        fontWeight: 'bold',
+        marginBottom: '1rem',
+        color: 'var(--text-accent)',
+        textShadow: '0 0 20px rgba(139, 92, 246, 0.3)'
+      }}>
+        {title}
+      </h3>
+      <p style={{
+        color: 'var(--text-secondary)',
+        lineHeight: '1.6'
+      }}>
+        {description}
+      </p>
     </div>
   );
 }

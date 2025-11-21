@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const BASE_URL = process.env.APP_BASE_URL || 'http://localhost:3000';
 
 // Helper function to login
-async function login(page: any, email: string, password: string) {
+async function login(page: import('@playwright/test').Page, email: string, password: string) {
     await page.goto(`${BASE_URL}/api/auth/login`);
 
     // Wait for Auth0 login page

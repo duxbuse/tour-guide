@@ -325,7 +325,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // Update the merch item
-        const updatedItem = await db.merchItem.update({
+        await db.merchItem.update({
             where: { id },
             data: {
                 ...(name && { name }),
