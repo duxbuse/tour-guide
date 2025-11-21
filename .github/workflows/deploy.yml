@@ -58,6 +58,7 @@ jobs:
       - name: Run Database Migration (Neon)
         run: npx prisma db push --accept-data-loss
         env:
+          DATABASE_PROVIDER: "postgresql"
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Seed Production Database (Optional)
