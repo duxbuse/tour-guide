@@ -2,9 +2,55 @@ import { auth0 } from '@/lib/auth0';
 import { findOrCreateUser } from '@/lib/db';
 import db from '@/lib/db';
 
+interface Show {
+  id: string;
+  name: string;
+  date: Date;
+  venue: string | null;
+}
+
+interface MerchItem {
+  id: string;
+  name: string;
+}
+
+interface Variant {
+  id: string;
+  size: string;
+  type: string | null;
+  price: number;
+  quantity: number;
+  merchItem: MerchItem;
+}
+
+interface InventoryRecord {
+  id: string;
+  startCount: number;
+  addedCount: number;
+  endCount: number | null;
+  soldCount: number | null;
+  showId: string;
+  variantId: string;
+  variant: Variant;
+  show: Show;
+}
+
+interface Tour {
+  id: string;
+  name: string;
+  isActive: boolean;
+  startDate: Date | null;
+  endDate: Date | null;
+  shows: Show[];
+  _count: {
+    shows: number;
+    merchItems: number;
+  };
+}
+
 interface DashboardData {
-  tours: any[];
-  allInventoryRecords: any[];
+  tours: Tour[];
+  allInventoryRecords: InventoryRecord[];
   stats: {
     totalRevenue: number;
     totalSold: number;
@@ -239,7 +285,7 @@ function StatCard({ label, value, desc, positive }: {
   );
 }
 
-function calculateStats(tours: any[], allInventoryRecords: any[]) {
+function calculateStats(tours: Tour[], allInventoryRecords: InventoryRecord[]) {
   const totalSold = allInventoryRecords.reduce((sum, record) =>
     sum + (record.soldCount || 0), 0
   );
@@ -253,7 +299,7 @@ function calculateStats(tours: any[], allInventoryRecords: any[]) {
   ).length;
 
   const upcomingShows = tours.reduce((total, tour) => {
-    return total + tour.shows.filter((show: any) =>
+    return total + tour.shows.filter((show: Show) =>
       new Date(show.date) > new Date()
     ).length;
   }, 0);
@@ -270,7 +316,7 @@ function calculateStats(tours: any[], allInventoryRecords: any[]) {
   };
 }
 
-function calculateTotalShrinkage(allInventoryRecords: any[]) {
+function calculateTotalShrinkage(allInventoryRecords: InventoryRecord[]) {
   const shrinkageData: Array<{ shrinkage: number; value: number }> = [];
 
   // Group records by variant
@@ -279,10 +325,10 @@ function calculateTotalShrinkage(allInventoryRecords: any[]) {
     if (!acc[key]) acc[key] = [];
     acc[key].push(record);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, InventoryRecord[]>);
 
-  (Object.values(recordsByVariant) as any[][]).forEach((variantRecords) => {
-    const sortedRecords = variantRecords.sort((a: any, b: any) =>
+  Object.values(recordsByVariant).forEach((variantRecords) => {
+    const sortedRecords = variantRecords.sort((a: InventoryRecord, b: InventoryRecord) =>
       new Date(a.show.date).getTime() - new Date(b.show.date).getTime()
     );
 

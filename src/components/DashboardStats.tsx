@@ -2,9 +2,55 @@
 
 import { useState, useEffect } from 'react';
 
+interface Show {
+    id: string;
+    name: string;
+    date: Date;
+    venue: string | null;
+}
+
+interface MerchItem {
+    id: string;
+    name: string;
+}
+
+interface Variant {
+    id: string;
+    size: string;
+    type: string | null;
+    price: number;
+    quantity: number;
+    merchItem: MerchItem;
+}
+
+interface InventoryRecord {
+    id: string;
+    startCount: number;
+    addedCount: number;
+    endCount: number | null;
+    soldCount: number | null;
+    showId: string;
+    variantId: string;
+    variant: Variant;
+    show: Show;
+}
+
+interface Tour {
+    id: string;
+    name: string;
+    isActive: boolean;
+    startDate: Date | null;
+    endDate: Date | null;
+    shows: Show[];
+    _count: {
+        shows: number;
+        merchItems: number;
+    };
+}
+
 interface DashboardData {
-    tours: any[];
-    allInventoryRecords: any[];
+    tours: Tour[];
+    allInventoryRecords: InventoryRecord[];
 }
 
 interface DashboardStatsProps {
@@ -93,7 +139,7 @@ export default function DashboardStats({ initialData }: DashboardStatsProps) {
     );
 }
 
-function calculateTotals(tours: any[], allInventoryRecords: any[]) {
+function calculateTotals(tours: Tour[], allInventoryRecords: InventoryRecord[]) {
     const totalSold = allInventoryRecords.reduce((sum, record) =>
         sum + (record.soldCount || 0), 0
     );
@@ -107,7 +153,7 @@ function calculateTotals(tours: any[], allInventoryRecords: any[]) {
     ).length;
 
     const upcomingShows = tours.reduce((total, tour) => {
-        return total + tour.shows.filter((show: any) =>
+        return total + tour.shows.filter((show: Show) =>
             new Date(show.date) > new Date()
         ).length;
     }, 0);
@@ -124,7 +170,7 @@ function calculateTotals(tours: any[], allInventoryRecords: any[]) {
     };
 }
 
-function calculateTotalShrinkage(allInventoryRecords: any[]) {
+function calculateTotalShrinkage(allInventoryRecords: InventoryRecord[]) {
     interface ShrinkageItem {
         shrinkage: number;
         value: number;
@@ -138,11 +184,11 @@ function calculateTotalShrinkage(allInventoryRecords: any[]) {
         if (!acc[key]) acc[key] = [];
         acc[key].push(record);
         return acc;
-    }, {} as Record<string, any[]>);
+    }, {} as Record<string, InventoryRecord[]>);
 
-    (Object.values(recordsByVariant) as any[][]).forEach((variantRecords) => {
+    Object.values(recordsByVariant).forEach((variantRecords) => {
         // Sort by show date
-        const sortedRecords = variantRecords.sort((a: any, b: any) =>
+        const sortedRecords = variantRecords.sort((a: InventoryRecord, b: InventoryRecord) =>
             new Date(a.show.date).getTime() - new Date(b.show.date).getTime()
         );
 
