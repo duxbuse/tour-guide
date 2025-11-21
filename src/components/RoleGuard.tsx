@@ -22,7 +22,7 @@ export async function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
 
     // Also check for roles in the standard location if the custom claim isn't present
     // This is a fallback in case the Action isn't set up exactly as described
-    const standardRoles = (session.user.roles as string[]) || [];
+    const standardRoles = ((session.user as any).roles as string[]) || []; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const allUserRoles = [...userRoles, ...standardRoles];
 

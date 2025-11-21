@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
                 sub: 'auth0|691f989d2bc713054fec2340',
                 email: 'manager@test.com',
                 name: 'Tour Manager',
+                picture: 'https://github.com/shadcn.png',
                 'https://tour-guide.app/roles': ['Manager']
             };
         }
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
                 sub: 'auth0|691f989d2bc713054fec2340',
                 email: 'manager@test.com',
                 name: 'Tour Manager',
+                picture: 'https://github.com/shadcn.png',
                 'https://tour-guide.app/roles': ['Manager']
             };
         }
@@ -212,6 +214,7 @@ export async function PUT(request: NextRequest) {
                 sub: 'demo-user',
                 email: 'demo@example.com',
                 name: 'Demo User',
+                picture: 'https://github.com/shadcn.png',
                 'https://tour-guide.app/roles': ['Manager']
             };
         }
@@ -315,6 +318,7 @@ export async function DELETE(request: NextRequest) {
                 sub: 'demo-user',
                 email: 'demo@example.com',
                 name: 'Demo User',
+                picture: 'https://github.com/shadcn.png',
                 'https://tour-guide.app/roles': ['Manager']
             };
         }
