@@ -253,7 +253,7 @@ function calculateStats(tours: any[], allInventoryRecords: any[]) {
   ).length;
 
   const upcomingShows = tours.reduce((total, tour) => {
-    return total + tour.shows.filter(show => 
+    return total + tour.shows.filter((show: any) =>
       new Date(show.date) > new Date()
     ).length;
   }, 0);
@@ -281,8 +281,8 @@ function calculateTotalShrinkage(allInventoryRecords: any[]) {
     return acc;
   }, {} as Record<string, any[]>);
 
-  Object.values(recordsByVariant).forEach((variantRecords) => {
-    const sortedRecords = variantRecords.sort((a, b) =>
+  (Object.values(recordsByVariant) as any[][]).forEach((variantRecords) => {
+    const sortedRecords = variantRecords.sort((a: any, b: any) =>
       new Date(a.show.date).getTime() - new Date(b.show.date).getTime()
     );
 
