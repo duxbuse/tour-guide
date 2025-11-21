@@ -1,4 +1,5 @@
 {
+  "framework": "nextjs",
   "build": {
     "env": {
       "DATABASE_URL": "$DATABASE_URL"
