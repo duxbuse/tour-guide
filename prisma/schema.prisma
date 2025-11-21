@@ -75,6 +75,7 @@ model MerchVariant {
   size      String   // e.g. "M", "L", "One Size"
   type      String?  // e.g. "Mens", "Womens"
   price     Float
+  quantity  Int      @default(0)  // Available quantity
   
   merchItemId String
   merchItem   MerchItem @relation(fields: [merchItemId], references: [id], onDelete: Cascade)

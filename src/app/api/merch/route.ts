@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     try {
         const session = await auth0.getSession();
 
-        let auth0User = session?.user;
+        let auth0User = session?.user as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
         // Fallback to demo user for development
         if (!auth0User) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth0.getSession();
 
-        let auth0User = session?.user;
+        let auth0User = session?.user as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
         // Fallback to demo user for development
         if (!auth0User) {
@@ -129,10 +129,11 @@ export async function POST(request: NextRequest) {
                 imageUrl,
                 tourId,
                 variants: {
-                    create: variants.map((v: any) => ({
+                    create: variants.map((v: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
                         size: v.size,
                         type: v.type,
                         price: parseFloat(v.price),
+                        quantity: parseInt(v.quantity) || 0,
                     })),
                 },
             },
@@ -144,6 +145,173 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(merchItem, { status: 201 });
     } catch (error) {
         console.error('Error creating merch item:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await auth0.getSession();
+
+        let auth0User = session?.user as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+        // Fallback to demo user for development
+        if (!auth0User) {
+            auth0User = {
+                sub: 'demo-user',
+                email: 'demo@example.com',
+                name: 'Demo User'
+            };
+        }
+
+        // Find or create user in DB
+        let user = await db.user.findUnique({
+            where: { auth0Id: auth0User.sub }
+        });
+
+        if (!user) {
+            user = await db.user.create({
+                data: {
+                    auth0Id: auth0User.sub,
+                    email: auth0User.email || 'demo@example.com',
+                    name: auth0User.name || 'Demo User',
+                    role: 'MANAGER'
+                }
+            });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const merchItemId = searchParams.get('id');
+
+        if (!merchItemId) {
+            return NextResponse.json({ error: 'Merch item ID is required' }, { status: 400 });
+        }
+
+        // Verify merch item belongs to user's tour
+        const merchItem = await db.merchItem.findFirst({
+            where: {
+                id: merchItemId,
+                tour: {
+                    managerId: user.id,
+                },
+            },
+        });
+
+        if (!merchItem) {
+            return NextResponse.json({ error: 'Merch item not found' }, { status: 404 });
+        }
+
+        // Delete the merch item (variants will be deleted by cascade)
+        await db.merchItem.delete({
+            where: { id: merchItemId },
+        });
+
+        return NextResponse.json({ message: 'Merch item deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting merch item:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
+export async function PUT(request: NextRequest) {
+    try {
+        const session = await auth0.getSession();
+
+        let auth0User = session?.user as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+        // Fallback to demo user for development
+        if (!auth0User) {
+            auth0User = {
+                sub: 'demo-user',
+                email: 'demo@example.com',
+                name: 'Demo User'
+            };
+        }
+
+        // Find or create user in DB
+        let user = await db.user.findUnique({
+            where: { auth0Id: auth0User.sub }
+        });
+
+        if (!user) {
+            user = await db.user.create({
+                data: {
+                    auth0Id: auth0User.sub,
+                    email: auth0User.email || 'demo@example.com',
+                    name: auth0User.name || 'Demo User',
+                    role: 'MANAGER'
+                }
+            });
+        }
+
+        const body = await request.json();
+        const { id, name, description, imageUrl, variants } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: 'Merch item ID is required' }, { status: 400 });
+        }
+
+        // Verify merch item belongs to user's tour
+        const existingItem = await db.merchItem.findFirst({
+            where: {
+                id,
+                tour: {
+                    managerId: user.id,
+                },
+            },
+            include: {
+                variants: true,
+            },
+        });
+
+        if (!existingItem) {
+            return NextResponse.json({ error: 'Merch item not found' }, { status: 404 });
+        }
+
+        // Update the merch item
+        const updatedItem = await db.merchItem.update({
+            where: { id },
+            data: {
+                ...(name && { name }),
+                ...(description !== undefined && { description }),
+                ...(imageUrl !== undefined && { imageUrl }),
+            },
+            include: {
+                variants: true,
+            },
+        });
+
+        // Update variants if provided
+        if (variants && Array.isArray(variants)) {
+            for (const variant of variants) {
+                if (variant.id) {
+                    // Update existing variant
+                    await db.merchVariant.update({
+                        where: { id: variant.id },
+                        data: {
+                            ...(variant.size && { size: variant.size }),
+                            ...(variant.type !== undefined && { type: variant.type }),
+                            ...(variant.price !== undefined && { price: parseFloat(variant.price) }),
+                            ...(variant.quantity !== undefined && { quantity: parseInt(variant.quantity) }),
+                        },
+                    });
+                }
+            }
+        }
+
+        // Fetch updated item with variants
+        const finalItem = await db.merchItem.findUnique({
+            where: { id },
+            include: {
+                variants: {
+                    orderBy: { size: 'asc' },
+                },
+            },
+        });
+
+        return NextResponse.json(finalItem);
+    } catch (error) {
+        console.error('Error updating merch item:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

@@ -7,6 +7,7 @@ interface MerchVariant {
     size: string;
     type: string | null;
     price: number;
+    quantity: number;
 }
 
 interface MerchItem {
@@ -29,6 +30,9 @@ export default function InventoryPage() {
     const [loading, setLoading] = useState(true);
     const [showNewItemModal, setShowNewItemModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [editingItem, setEditingItem] = useState<MerchItem | null>(null);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     const [newItem, setNewItem] = useState({
         name: '',
@@ -38,7 +42,7 @@ export default function InventoryPage() {
     });
 
     const [variants, setVariants] = useState([
-        { size: 'S', type: '' },
+        { size: 'S', type: '', quantity: '0' },
     ]);
 
     useEffect(() => {
@@ -80,6 +84,34 @@ export default function InventoryPage() {
         }
     };
 
+    const handleImageUpload = async (file: File) => {
+        if (!file) return null;
+
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (response.ok) {
+                const { url } = await response.json();
+                return url;
+            } else {
+                console.error('Failed to upload image');
+                return null;
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            return null;
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const handleCreateItem = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedTourId) return;
@@ -87,6 +119,16 @@ export default function InventoryPage() {
         setSubmitting(true);
 
         try {
+            // Handle image upload if a file was selected
+            let imageUrl = newItem.imageUrl;
+            const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+            if (fileInput?.files?.[0]) {
+                const uploadedUrl = await handleImageUpload(fileInput.files[0]);
+                if (uploadedUrl) {
+                    imageUrl = uploadedUrl;
+                }
+            }
+
             const response = await fetch('/api/merch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -94,8 +136,8 @@ export default function InventoryPage() {
                     tourId: selectedTourId,
                     name: newItem.name,
                     description: newItem.description,
-                    imageUrl: newItem.imageUrl,
-                    variants: variants.filter(v => v.size).map(v => ({ ...v, price: newItem.price })),
+                    imageUrl: imageUrl,
+                    variants: variants.filter(v => v.size).map(v => ({ ...v, price: newItem.price, quantity: v.quantity })),
                 }),
             });
 
@@ -104,7 +146,11 @@ export default function InventoryPage() {
                 setMerchItems([item, ...merchItems]);
                 setShowNewItemModal(false);
                 setNewItem({ name: '', description: '', imageUrl: '', price: '' });
-                setVariants([{ size: 'S', type: '' }]);
+                setVariants([{ size: 'S', type: '', quantity: '0' }]);
+                // Reset file input
+                if (fileInput) {
+                    fileInput.value = '';
+                }
             }
         } catch (error) {
             console.error('Error creating merch item:', error);
@@ -113,8 +159,55 @@ export default function InventoryPage() {
         }
     };
 
+    const handleDeleteItem = async (itemId: string) => {
+        if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/merch?id=${itemId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                setMerchItems(merchItems.filter(item => item.id !== itemId));
+            }
+        } catch (error) {
+            console.error('Error deleting merch item:', error);
+        }
+    };
+
+    const handleEditItem = (item: MerchItem) => {
+        setEditingItem(item);
+        setShowEditModal(true);
+    };
+
+    const handleUpdateQuantities = async (itemId: string, updatedVariants: MerchVariant[]) => {
+        try {
+            const response = await fetch('/api/merch', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: itemId,
+                    variants: updatedVariants,
+                }),
+            });
+
+            if (response.ok) {
+                const updatedItem = await response.json();
+                setMerchItems(items => items.map(item =>
+                    item.id === itemId ? updatedItem : item
+                ));
+                setShowEditModal(false);
+                setEditingItem(null);
+            }
+        } catch (error) {
+            console.error('Error updating quantities:', error);
+        }
+    };
+
     const addVariant = () => {
-        setVariants([...variants, { size: '', type: '' }]);
+        setVariants([...variants, { size: '', type: '', quantity: '0' }]);
     };
 
     const removeVariant = (index: number) => {
@@ -191,7 +284,7 @@ export default function InventoryPage() {
                 <div className="inventory-stat">
                     <div className="inventory-stat-value">
                         ${merchItems.reduce((sum, item) =>
-                            sum + item.variants.reduce((vSum, v) => vSum + v.price, 0), 0
+                            sum + item.variants.reduce((vSum, v) => vSum + (v.price * v.quantity), 0), 0
                         ).toFixed(2)}
                     </div>
                     <div className="inventory-stat-label">Total Value</div>
@@ -223,15 +316,38 @@ export default function InventoryPage() {
                                 {item.description && (
                                     <div className="merch-description">{item.description}</div>
                                 )}
+                                <div className="merch-price" style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: '700',
+                                    color: 'var(--accent-secondary)',
+                                    textShadow: '0 0 10px var(--glow-pink)',
+                                    marginBottom: '1rem'
+                                }}>
+                                    ${item.variants[0]?.price.toFixed(2)}
+                                </div>
                                 <div className="variant-list">
                                     {item.variants.map((variant) => (
                                         <div key={variant.id} className="variant-item">
                                             <span className="variant-name">
                                                 {variant.type ? `${variant.type} - ` : ''}{variant.size}
                                             </span>
-                                            <span className="variant-price">${variant.price.toFixed(2)}</span>
+                                            <span className="variant-quantity">Qty: {variant.quantity}</span>
                                         </div>
                                     ))}
+                                </div>
+                                <div className="merch-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <button
+                                        className="btn btn-secondary btn-small"
+                                        onClick={() => handleEditItem(item)}
+                                    >
+                                        Edit Quantities
+                                    </button>
+                                    <button
+                                        className="btn btn-danger btn-small"
+                                        onClick={() => handleDeleteItem(item.id)}
+                                    >
+                                        Delete
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -270,14 +386,18 @@ export default function InventoryPage() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Image URL (Optional)</label>
+                                <label className="form-label">Image (Optional)</label>
                                 <input
-                                    type="url"
+                                    type="file"
                                     className="form-input"
-                                    placeholder="https://..."
-                                    value={newItem.imageUrl}
-                                    onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                                    accept="image/*"
+                                    disabled={uploading}
                                 />
+                                {uploading && (
+                                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                        Uploading image...
+                                    </p>
+                                )}
                             </div>
 
                             <div className="form-group">
@@ -310,15 +430,24 @@ export default function InventoryPage() {
                                             style={{ flex: 1 }}
                                         />
                                         <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Type (optional)"
-                                            value={variant.type}
-                                            onChange={(e) => updateVariant(index, 'type', e.target.value)}
-                                            style={{ flex: 1 }}
-                                        />
+                                             type="text"
+                                             className="form-input"
+                                             placeholder="Type (optional)"
+                                             value={variant.type}
+                                             onChange={(e) => updateVariant(index, 'type', e.target.value)}
+                                             style={{ flex: 1 }}
+                                         />
+                                         <input
+                                             type="number"
+                                             min="0"
+                                             className="form-input"
+                                             placeholder="Quantity"
+                                             value={variant.quantity}
+                                             onChange={(e) => updateVariant(index, 'quantity', e.target.value)}
+                                             style={{ flex: 1 }}
+                                         />
 
-                                        {variants.length > 1 && (
+                                         {variants.length > 1 && (
                                             <button
                                                 type="button"
                                                 className="btn btn-secondary"
@@ -349,11 +478,67 @@ export default function InventoryPage() {
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? 'Creating...' : 'Create Item'}
+                                <button type="submit" className="btn btn-primary" disabled={submitting || uploading}>
+                                    {submitting ? 'Creating...' : uploading ? 'Uploading...' : 'Create Item'}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Item Modal */}
+            {showEditModal && editingItem && (
+                <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                        <div className="modal-header">
+                            <h2>Edit Quantities - {editingItem.name}</h2>
+                            <button className="close-btn" onClick={() => setShowEditModal(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '1.5rem' }}>
+                            <div className="form-group">
+                                <label className="form-label">Update Quantities</label>
+                                {editingItem.variants.map((variant, index) => (
+                                    <div key={variant.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--background-secondary)', borderRadius: '8px' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <strong>{variant.type ? `${variant.type} - ` : ''}{variant.size}</strong>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                                ${variant.price.toFixed(2)}
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className="form-input"
+                                            placeholder="Quantity"
+                                            defaultValue={variant.quantity}
+                                            onChange={(e) => {
+                                                const updatedVariants = [...editingItem.variants];
+                                                updatedVariants[index] = { ...updatedVariants[index], quantity: parseInt(e.target.value) || 0 };
+                                                setEditingItem({ ...editingItem, variants: updatedVariants });
+                                            }}
+                                            style={{ width: '100px' }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setShowEditModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => handleUpdateQuantities(editingItem.id, editingItem.variants)}
+                                >
+                                    Update Quantities
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
