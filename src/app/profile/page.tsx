@@ -1,5 +1,6 @@
 import { auth0 } from '@/lib/auth0';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default async function ProfilePage() {
     const session = await auth0.getSession();
@@ -28,10 +29,12 @@ export default async function ProfilePage() {
         <div style={{ padding: '2rem', fontFamily: 'system-ui' }}>
             <h1>Profile</h1>
             <div style={{ marginBottom: '2rem' }}>
-                <img
+                <Image
                     src={session.user.picture}
-                    alt={session.user.name}
-                    style={{ borderRadius: '50%', width: '80px', height: '80px' }}
+                    alt={session.user.name || 'User'}
+                    width={80}
+                    height={80}
+                    style={{ borderRadius: '50%' }}
                 />
                 <h2>{session.user.name}</h2>
                 <p>{session.user.email}</p>

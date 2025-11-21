@@ -27,12 +27,14 @@ export const auth0 = {
                 sub: 'auth0|manager-user-id',
                 email: process.env.AUTH0_MANAGER_EMAIL || 'manager@test.com',
                 name: 'Tour Manager',
+                picture: 'https://github.com/shadcn.png',
                 'https://tour-guide.app/roles': ['Manager']
             },
             seller: {
                 sub: 'auth0|seller-user-id',
                 email: process.env.AUTH0_SELLER_EMAIL || 'seller@test.com',
                 name: 'Tour Seller',
+                picture: 'https://github.com/shadcn.png',
                 'https://tour-guide.app/roles': ['Seller']
             }
         };

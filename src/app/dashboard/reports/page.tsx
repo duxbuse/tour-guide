@@ -46,12 +46,6 @@ interface VariantSales {
     revenue: number;
 }
 
-interface ItemGroup {
-    name: string;
-    totalSold: number;
-    totalRevenue: number;
-    variants: VariantSales[];
-}
 
 export default function ReportsPage() {
     const [tours, setTours] = useState<Tour[]>([]);
@@ -70,6 +64,7 @@ export default function ReportsPage() {
         };
         fetchUser();
         fetchTours();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -145,7 +140,7 @@ export default function ReportsPage() {
             return acc;
         }, {} as Record<string, InventoryRecord[]>);
 
-        Object.entries(recordsByVariant).forEach(([variantId, variantRecords]) => {
+        Object.entries(recordsByVariant).forEach(([ , variantRecords]) => {
             // Sort by show date
             const sortedRecords = variantRecords.sort((a, b) =>
                 new Date(a.show.date).getTime() - new Date(b.show.date).getTime()

@@ -1,5 +1,6 @@
 import { auth0 } from '@/lib/auth0';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export async function NavBar() {
     const session = await auth0.getSession();
@@ -39,12 +40,15 @@ export async function NavBar() {
                             <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.email}</span>
                         </div>
                         {user.picture && (
-                            <img
+                            <Image
                                 src={user.picture}
-                                alt={user.name}
-                                style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+                                alt={user.name || 'User'}
+                                width={32}
+                                height={32}
+                                style={{ borderRadius: '50%' }}
                             />
                         )}
+                        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                         <a
                             href="/api/auth/logout"
                             style={{
@@ -60,6 +64,7 @@ export async function NavBar() {
                         </a>
                     </div>
                 ) : (
+                    // eslint-disable-next-line @next/next/no-html-link-for-pages
                     <a
                         href="/api/auth/login"
                         style={{

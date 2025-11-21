@@ -5,10 +5,10 @@
  * Run with: node scripts/setup.js
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -24,7 +24,7 @@ function exec(command, options = {}) {
     try {
         execSync(command, { stdio: 'inherit', ...options });
         return true;
-    } catch (error) {
+    } catch {
         console.error(`Error executing: ${command}`);
         return false;
     }

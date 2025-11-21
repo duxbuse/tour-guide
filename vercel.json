@@ -1,12 +1,11 @@
 {
+  "framework": "nextjs",
   "build": {
     "env": {
-      "DATABASE_URL": "@DATABASE_URL"
+      "DATABASE_URL": "$DATABASE_URL"
     }
   },
-  "functions": {
-    "app/api/**/*.ts": {
-      "maxDuration": 60
-    }
+  "env": {
+    "DATABASE_URL": "$DATABASE_URL"
   }
 }

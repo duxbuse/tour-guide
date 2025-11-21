@@ -1,10 +1,10 @@
 // Test script to verify Vercel Blob image upload
 // Run with: node scripts/test-upload.js
 
-const fs = require('fs');
-const path = require('path');
-const FormData = require('form-data');
-const fetch = require('node-fetch');
+import fs from 'fs';
+import path from 'path';
+import FormData from 'form-data';
+import fetch from 'node-fetch';
 
 async function testUpload() {
     try {
