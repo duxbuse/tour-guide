@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { auth0 } from "@/lib/auth0";
+import { DashboardSkeleton } from '@/components/LoadingSkeleton';
 
 interface Show {
     id: string;
@@ -56,23 +57,15 @@ export default function DashboardPage() {
                     setUser(session.user);
                 }
 
-                // Fetch all tours
-                const toursResponse = await fetch('/api/tours');
-                if (toursResponse.ok) {
-                    const toursData = await toursResponse.json();
-                    setTours(toursData);
-
-                    // Fetch inventory records for all tours
-                    const allInventoryPromises = toursData.map((tour: Tour) =>
-                        fetch(`/api/inventory?tourId=${tour.id}`).then(res => res.json())
-                    );
-
-                    const allInventoryResults = await Promise.all(allInventoryPromises);
-                    const combinedInventory = allInventoryResults.flat();
-                    setAllInventoryRecords(combinedInventory);
+                // Fetch all dashboard data in one optimized request
+                const dashboardResponse = await fetch('/api/dashboard');
+                if (dashboardResponse.ok) {
+                    const dashboardData = await dashboardResponse.json();
+                    setTours(dashboardData.tours);
+                    setAllInventoryRecords(dashboardData.allInventoryRecords);
                 }
             } catch (error) {
-                console.error('Error fetching data:', error);
+                console.error('Error fetching dashboard data:', error);
             } finally {
                 setLoading(false);
             }
@@ -170,11 +163,7 @@ export default function DashboardPage() {
     const hasAccess = userRoles.includes('manager') || userRoles.includes('seller');
 
     if (loading) {
-        return (
-            <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
-                <p>Loading dashboard...</p>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     // Check if user has access to dashboard

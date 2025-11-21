@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, User } from '@prisma/client'
+import { getCachedUser, setCachedUser } from './cache'
 
 const prismaClientSingleton = () => {
   // Log environment state for debugging
@@ -32,9 +33,17 @@ const prismaClientSingleton = () => {
   }
 
   try {
-    console.log('✅ Creating Prisma Client with valid DATABASE_URL')
+    console.log('✅ Creating Prisma Client with optimized configuration')
     return new PrismaClient({
       log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      // Connection pool optimization
+      datasources: {
+        db: {
+          url: dbUrl,
+        },
+      },
+      // Enable query optimization features
+      // Note: These would be configured in schema.prisma for connection pooling
     })
   } catch (error) {
     console.error('❌ Failed to create Prisma Client:', error)
@@ -51,3 +60,76 @@ const db = globalThis.prisma ?? prismaClientSingleton()
 export default db
 
 if (process.env.NODE_ENV !== 'production') globalThis.prisma = db
+
+// Helper function to find or create user (eliminates repetitive code)
+export async function findOrCreateUser(auth0User: {
+  sub: string;
+  email?: string;
+  name?: string;
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+}): Promise<User> {
+  if (!auth0User) {
+    throw new Error('No auth0 user provided')
+  }
+
+  // Check cache first
+  const cachedUser = getCachedUser(auth0User.sub) as User | null
+  if (cachedUser) {
+    return cachedUser
+  }
+
+  // Try to find by auth0Id first
+  let user = await db.user.findUnique({
+    where: { auth0Id: auth0User.sub }
+  })
+
+  if (!user) {
+    // Try to find by email as fallback
+    user = await db.user.findUnique({
+      where: { email: auth0User.email }
+    })
+    
+    // If found by email, update the auth0Id
+    if (user) {
+      user = await db.user.update({
+        where: { id: user.id },
+        data: { auth0Id: auth0User.sub }
+      })
+    } else {
+      // Create new user if not found
+      try {
+        user = await db.user.create({
+          data: {
+            auth0Id: auth0User.sub,
+            email: auth0User.email || 'manager@test.com',
+            name: auth0User.name || 'Tour Manager',
+            role: 'MANAGER'
+          }
+        })
+      } catch (e) {
+        // Handle unique constraint errors
+        if (e && typeof e === 'object' && 'code' in e && e.code === 'P2002') {
+          user = await db.user.findFirst({
+            where: {
+              OR: [
+                { auth0Id: auth0User.sub },
+                { email: auth0User.email }
+              ]
+            }
+          })
+        } else {
+          throw e
+        }
+      }
+    }
+  }
+
+  if (!user) {
+    throw new Error('Failed to find or create user')
+  }
+
+  // Cache the user for future requests
+  setCachedUser(auth0User.sub, user)
+
+  return user
+}

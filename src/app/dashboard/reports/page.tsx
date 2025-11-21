@@ -182,13 +182,14 @@ export default function ReportsPage() {
         const shrinkageData = calculateShrinkage();
         const totalShrinkage = shrinkageData.reduce((sum, item) => sum + item.shrinkage, 0);
         const totalShrinkageValue = shrinkageData.reduce((sum, item) => sum + item.value, 0);
-
+        
+        const showCount = selectedTour?.shows?.length || 0;
         return {
             totalSold,
             totalRevenue,
             totalShrinkage,
             totalShrinkageValue,
-            avgPerShow: selectedTour && selectedTour.shows.length > 0 ? totalRevenue / selectedTour.shows.length : 0
+            avgPerShow: showCount > 0 ? totalRevenue / showCount : 0
         };
     };
 
@@ -197,13 +198,13 @@ export default function ReportsPage() {
 
     const handleExportCSV = () => {
         if (!selectedTourId || !selectedTour) return;
-        if (!selectedTour.shows.length) {
+        if (!(selectedTour.shows?.length || 0)) {
             alert('No data to export');
             return;
         }
 
         import('xlsx').then(xlsx => {
-            const data = selectedTour.shows.map(show => {
+            const data = (selectedTour.shows || []).map(show => {
                 const showSales = inventoryRecords
                     .filter(r => r.showId === show.id)
                     .reduce((sum, r) => sum + (r.soldCount || 0), 0);
@@ -245,13 +246,13 @@ export default function ReportsPage() {
 
     const handleExportExcel = () => {
         if (!selectedTourId || !selectedTour) return;
-        if (!selectedTour.shows.length) {
+        if (!(selectedTour.shows?.length || 0)) {
             alert('No data to export');
             return;
         }
 
         import('xlsx').then(xlsx => {
-            const showData = selectedTour.shows.map(show => {
+            const showData = (selectedTour.shows || []).map(show => {
                 const showSales = inventoryRecords
                     .filter(r => r.showId === show.id)
                     .reduce((sum, r) => sum + (r.soldCount || 0), 0);
@@ -275,7 +276,7 @@ export default function ReportsPage() {
             // Add an overview sheet
             const overviewData = [
                 { Metric: 'Tour Name', Value: selectedTour.name },
-                { Metric: 'Total Shows', Value: selectedTour.shows.length },
+                { Metric: 'Total Shows', Value: selectedTour.shows?.length || 0 },
                 { Metric: 'Total Revenue', Value: stats.totalRevenue },
                 { Metric: 'Total Items Sold', Value: stats.totalSold },
                 { Metric: 'Lost/Damaged Items', Value: stats.totalShrinkage },
@@ -399,7 +400,7 @@ export default function ReportsPage() {
                     <div className="stat-grid">
                         <div className="stat-card">
                             <div className="stat-label">Total Shows</div>
-                            <div className="stat-value">{selectedTour.shows.length}</div>
+                            <div className="stat-value">{selectedTour.shows?.length || 0}</div>
                             <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                                 Across the tour
                             </div>
@@ -434,7 +435,7 @@ export default function ReportsPage() {
                         {/* Sales by Show */}
                         <div className="card">
                             <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Sales by Show</h2>
-                            {selectedTour.shows.length > 0 ? (
+                            {(selectedTour.shows?.length || 0) > 0 ? (
                                 <div className="table-container">
                                     <table className="table">
                                         <thead>
@@ -447,7 +448,7 @@ export default function ReportsPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {selectedTour.shows.map((show) => {
+                                            {(selectedTour.shows || []).map((show) => {
                                                const showSales = inventoryRecords
                                                    .filter(r => r.showId === show.id)
                                                    .reduce((sum, r) => sum + (r.soldCount || 0), 0);

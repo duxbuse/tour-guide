@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { auth0 } from '@/lib/auth0';
+import { ToursSkeleton } from '@/components/LoadingSkeleton';
 
 interface Show {
     id: string;
@@ -84,7 +85,8 @@ export default function ToursPage() {
 
     const fetchTours = async () => {
         try {
-            const response = await fetch('/api/tours');
+            // First load tours with shows for display
+            const response = await fetch('/api/tours?includeShows=true');
             if (response.ok) {
                 const data = await response.json();
                 setTours(data);
@@ -153,7 +155,7 @@ export default function ToursPage() {
                 const show = await response.json();
                 setTours(tours.map(tour =>
                     tour.id === selectedTourId
-                        ? { ...tour, shows: [...tour.shows, show] }
+                        ? { ...tour, shows: [...(tour.shows || []), show] }
                         : tour
                 ));
                 setShowNewShowModal(false);
@@ -301,7 +303,7 @@ export default function ToursPage() {
                     tour.id === selectedTourId
                         ? {
                             ...tour,
-                            shows: tour.shows.map(show =>
+                            shows: (tour.shows || []).map(show =>
                                 show.id === editingShow.id ? updatedShow : show
                             )
                           }
@@ -336,7 +338,7 @@ export default function ToursPage() {
             if (response.ok) {
                 setTours(tours.map(tour =>
                     tour.id === tourId
-                        ? { ...tour, shows: tour.shows.filter(s => s.id !== show.id) }
+                        ? { ...tour, shows: (tour.shows || []).filter(s => s.id !== show.id) }
                         : tour
                 ));
             } else {
@@ -350,11 +352,7 @@ export default function ToursPage() {
     };
 
     if (loading) {
-        return (
-            <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
-                <p>Loading tours...</p>
-            </div>
-        );
+        return <ToursSkeleton />;
     }
 
     return (
@@ -430,7 +428,7 @@ export default function ToursPage() {
                                             {tour.startDate && format(new Date(tour.startDate), 'MMM d, yyyy')} - {tour.endDate && format(new Date(tour.endDate), 'MMM d, yyyy')}
                                         </span>
                                         <span>•</span>
-                                        <span>{tour.shows.length} shows</span>
+                                        <span>{tour.shows?.length || 0} shows</span>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
@@ -519,7 +517,7 @@ export default function ToursPage() {
                                 </div>
                             </div>
 
-                            {tour.shows.length > 0 && (
+                            {(tour.shows?.length || 0) > 0 && (
                                 <div className="table-container" style={{ marginTop: '1rem' }}>
                                     <table className="table">
                                         <thead>
@@ -531,7 +529,7 @@ export default function ToursPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {tour.shows.map((show) => (
+                                            {(tour.shows || []).map((show) => (
                                                 <tr key={show.id}>
                                                     <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{show.name}</td>
                                                     <td>{format(new Date(show.date), 'MMM d, yyyy')}</td>
@@ -563,7 +561,7 @@ export default function ToursPage() {
                                 </div>
                             )}
 
-                            {tour.shows.length === 0 && (
+                            {(!tour.shows || tour.shows.length === 0) && (
                                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                     <p>No shows scheduled yet. Add your first show to this tour.</p>
                                 </div>

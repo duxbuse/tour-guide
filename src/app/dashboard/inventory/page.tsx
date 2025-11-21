@@ -253,7 +253,7 @@ export default function InventoryPage() {
 
     const handleEditItem = (item: MerchItem) => {
         setEditingItem(item);
-        if (!canManageItems && tours.find(t => t.id === selectedTourId)?.shows?.length) {
+        if (!canManageItems && (tours.find(t => t.id === selectedTourId)?.shows?.length || 0) > 0) {
             // Sellers need to select a show for inventory tracking
             setShowInventoryModal(true);
         } else {
@@ -359,7 +359,7 @@ export default function InventoryPage() {
             xlsx.utils.book_append_sheet(workbook, worksheet, "Current_Inventory");
 
             // Add a separate show checklist sheet
-            const showData = selectedTour.shows.map(show => ({
+            const showData = (selectedTour.shows || []).map(show => ({
                 Show: show.name,
                 Date: new Date(show.date).toLocaleDateString(),
                 Venue: show.venue || '',
@@ -601,7 +601,7 @@ export default function InventoryPage() {
                         Show Inventory Records
                     </h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        {tours.find(t => t.id === selectedTourId)?.shows.map((show) => {
+                        {(tours.find(t => t.id === selectedTourId)?.shows || []).map((show) => {
                             const showRecords = inventoryRecords.filter(r => r.showId === show.id);
                             if (showRecords.length === 0) return null;
 
@@ -815,10 +815,10 @@ export default function InventoryPage() {
                             {selectedShowId && (
                                 <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
                                     <strong>Show: </strong>
-                                    {tours.find(t => t.id === selectedTourId)?.shows.find(s => s.id === selectedShowId)?.name}
+                                    {tours.find(t => t.id === selectedTourId)?.shows?.find(s => s.id === selectedShowId)?.name}
                                     <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                                         {(() => {
-                                            const show = tours.find(t => t.id === selectedTourId)?.shows.find(s => s.id === selectedShowId);
+                                            const show = tours.find(t => t.id === selectedTourId)?.shows?.find(s => s.id === selectedShowId);
                                             return show?.date ? new Date(show.date).toLocaleDateString() : '';
                                         })()}
                                     </div>
@@ -846,7 +846,7 @@ export default function InventoryPage() {
                                         
                                         if (!currentTour || !selectedShow) return variant.quantity;
 
-                                        const previousShows = currentTour.shows
+                                        const previousShows = (currentTour.shows || [])
                                             .filter(s => new Date(s.date) < new Date(selectedShow.date))
                                             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -1047,7 +1047,7 @@ export default function InventoryPage() {
                         <div style={{ padding: '1.5rem' }}>
                             <div className="form-group">
                                 <label className="form-label">Choose the show to track inventory for:</label>
-                                {tours.find(t => t.id === selectedTourId)?.shows.map((show) => (
+                                {(tours.find(t => t.id === selectedTourId)?.shows || []).map((show) => (
                                     <button
                                         key={show.id}
                                         onClick={() => handleInventoryForShow(show.id)}

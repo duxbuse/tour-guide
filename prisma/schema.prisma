@@ -16,6 +16,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   tours     Tour[]
+
+  @@index([auth0Id])
+  @@index([email])
 }
 
 model Tour {
@@ -32,6 +35,11 @@ model Tour {
   
   shows     Show[]
   merchItems MerchItem[]
+
+  @@index([managerId])
+  @@index([isActive])
+  @@index([managerId, isActive])
+  @@index([updatedAt])
 }
 
 model Show {
@@ -53,6 +61,10 @@ model Show {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tourId])
+  @@index([date])
+  @@index([tourId, date])
 }
 
 model MerchItem {
@@ -68,6 +80,8 @@ model MerchItem {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tourId])
 }
 
 model MerchVariant {
@@ -84,6 +98,9 @@ model MerchVariant {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([merchItemId])
+  @@index([quantity])
 }
 
 model InventoryRecord {
@@ -105,4 +122,7 @@ model InventoryRecord {
   updatedAt DateTime @updatedAt
 
   @@unique([showId, variantId])
+  @@index([showId])
+  @@index([variantId])
+  @@index([updatedAt])
 }

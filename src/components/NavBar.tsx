@@ -7,37 +7,36 @@ export async function NavBar() {
     const user = session?.user;
 
     return (
-        <nav style={{
-            borderBottom: '1px solid #e5e7eb',
-            padding: '1rem 2rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: 'white'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                <Link href="/" style={{ fontSize: '1.25rem', fontWeight: 'bold', textDecoration: 'none', color: 'black' }}>
+        <nav className="navbar">
+            <div className="navbar-left">
+                <Link href="/" className="navbar-brand">
                     🎸 Tour Guide
                 </Link>
 
                 {user && (
-                    <div style={{ display: 'flex', gap: '1.5rem' }}>
-                        <Link href="/dashboard" style={{ textDecoration: 'none', color: '#4b5563' }}>
+                    <div className="navbar-nav">
+                        <Link href="/dashboard" className="nav-link">
                             Dashboard
                         </Link>
-                        <Link href="/dashboard/tours" style={{ textDecoration: 'none', color: '#4b5563' }}>
+                        <Link href="/dashboard/tours" className="nav-link">
                             Tours
+                        </Link>
+                        <Link href="/dashboard/inventory" className="nav-link">
+                            Inventory
+                        </Link>
+                        <Link href="/dashboard/reports" className="nav-link">
+                            Reports
                         </Link>
                     </div>
                 )}
             </div>
 
-            <div>
+            <div className="navbar-right">
                 {user ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                            <span style={{ fontWeight: '500', fontSize: '0.875rem' }}>{user.name}</span>
-                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.email}</span>
+                    <div className="navbar-user">
+                        <div className="user-info">
+                            <span className="user-name">{user.name}</span>
+                            <span className="user-email">{user.email}</span>
                         </div>
                         {user.picture && (
                             <Image
@@ -45,38 +44,17 @@ export async function NavBar() {
                                 alt={user.name || 'User'}
                                 width={32}
                                 height={32}
-                                style={{ borderRadius: '50%' }}
+                                className="user-avatar"
                             />
                         )}
                         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-                        <a
-                            href="/api/auth/logout"
-                            style={{
-                                padding: '0.5rem 1rem',
-                                backgroundColor: '#f3f4f6',
-                                borderRadius: '0.375rem',
-                                textDecoration: 'none',
-                                color: '#374151',
-                                fontSize: '0.875rem'
-                            }}
-                        >
+                        <a href="/api/auth/logout" className="logout-btn">
                             Logout
                         </a>
                     </div>
                 ) : (
                     // eslint-disable-next-line @next/next/no-html-link-for-pages
-                    <a
-                        href="/api/auth/login"
-                        style={{
-                            padding: '0.5rem 1rem',
-                            backgroundColor: 'black',
-                            color: 'white',
-                            borderRadius: '0.375rem',
-                            textDecoration: 'none',
-                            fontSize: '0.875rem',
-                            fontWeight: '500'
-                        }}
-                    >
+                    <a href="/api/auth/login" className="btn btn-primary">
                         Log In
                     </a>
                 )}
