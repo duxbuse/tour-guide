@@ -21,7 +21,7 @@ export default function UserSwitcher() {
         setIsLoading(true);
         const newUserType = currentUserType === 'manager' ? 'seller' : 'manager';
         setUserType(newUserType);
-        
+
         // Refresh the page to update the session
         window.location.reload();
     };
@@ -44,9 +44,16 @@ export default function UserSwitcher() {
             onClick={switchUser}
             disabled={isLoading}
             className="switch-user-btn"
-            title={`Switch to ${currentUserType === 'manager' ? 'Seller' : 'Manager'}`}
+            title={`Switch to ${currentUserType === 'manager' ? 'Seller' : 'Manager'} (Demo)`}
         >
-            {isLoading ? '...' : `Switch to ${currentUserType === 'manager' ? 'Seller' : 'Manager'}`}
+            {isLoading ? (
+                '...'
+            ) : (
+                <>
+                    Switch to {currentUserType === 'manager' ? 'Seller' : 'Manager'}{' '}
+                    <span style={{ color: 'red' }}>(Demo Only)</span>
+                </>
+            )}
         </button>
     );
 }

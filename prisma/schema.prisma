@@ -67,11 +67,18 @@ model Show {
   @@index([tourId, date])
 }
 
+enum Category {
+  APPAREL
+  ACCESSORIES
+  MEDIA
+}
+
 model MerchItem {
   id        String   @id @default(cuid())
   name      String
   description String?
   imageUrl  String?  // Vercel Blob URL
+  category  Category @default(APPAREL)
   
   tourId    String
   tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
@@ -109,8 +116,9 @@ model InventoryRecord {
   startCount Int     @default(0)
   addedCount Int     @default(0)
   endCount   Int?    // Null until counted
+  shrinkage  Int     @default(0) // Damage/Theft
   
-  soldCount  Int?    // Calculated: start + added - end
+  soldCount  Int?    // Calculated: start + added - end - shrinkage
   
   showId    String
   show      Show     @relation(fields: [showId], references: [id], onDelete: Cascade)

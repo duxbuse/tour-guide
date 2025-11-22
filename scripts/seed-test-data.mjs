@@ -371,6 +371,7 @@ async function main() {
         name: 'Summer World Tour 2024 T-Shirt',
         description: 'Official unisex tour t-shirt with city-specific designs and tour dates',
         imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: summerTour.id
       }
     });
@@ -380,6 +381,7 @@ async function main() {
         name: 'Summer Tour Hoodie',
         description: 'Premium cotton blend hoodie with embroidered tour logo',
         imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: summerTour.id
       }
     });
@@ -389,6 +391,7 @@ async function main() {
         name: 'Summer Concert Poster',
         description: 'Limited edition holographic concert poster',
         imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop&crop=center',
+        category: 'MEDIA',
         tourId: summerTour.id
       }
     });
@@ -399,6 +402,7 @@ async function main() {
         name: "Men's European Tour Shirt",
         description: 'Tailored fit men\'s shirt with European flag design',
         imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: springTour.id
       }
     });
@@ -408,6 +412,7 @@ async function main() {
         name: "Women's European Tour Shirt",
         description: 'Fitted women\'s shirt with floral European motif',
         imageUrl: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: springTour.id
       }
     });
@@ -417,6 +422,7 @@ async function main() {
         name: 'European Tour Tote Bag',
         description: 'Canvas tote bag with tour cities map',
         imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop&crop=center',
+        category: 'ACCESSORIES',
         tourId: springTour.id
       }
     });
@@ -427,6 +433,7 @@ async function main() {
         name: "Men's Asia Pacific Tour Tee",
         description: 'Men\'s shirt featuring Asian-inspired artwork',
         imageUrl: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: fallTour.id
       }
     });
@@ -436,6 +443,7 @@ async function main() {
         name: "Women's Asia Pacific Tour Tee",
         description: 'Women\'s fitted tee with cherry blossom design',
         imageUrl: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: fallTour.id
       }
     });
@@ -445,6 +453,7 @@ async function main() {
         name: 'Asia Pacific Tour Snapback',
         description: 'Embroidered snapback cap with Japanese script',
         imageUrl: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=400&fit=crop&crop=center',
+        category: 'ACCESSORIES',
         tourId: fallTour.id
       }
     });
@@ -454,6 +463,7 @@ async function main() {
         name: 'Live in Tokyo Vinyl',
         description: 'Limited edition live recording from Tokyo Dome',
         imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop&crop=center',
+        category: 'MEDIA',
         tourId: fallTour.id
       }
     });
@@ -464,6 +474,7 @@ async function main() {
         name: 'Holiday Tour Long Sleeve',
         description: 'Festive long sleeve shirt with holiday tour artwork',
         imageUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: winterTour.id
       }
     });
@@ -473,6 +484,7 @@ async function main() {
         name: 'Winter Tour Knit Scarf',
         description: 'Warm knit scarf with tour logo embroidery',
         imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400&h=400&fit=crop&crop=center',
+        category: 'ACCESSORIES',
         tourId: winterTour.id
       }
     });

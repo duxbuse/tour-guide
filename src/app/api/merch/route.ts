@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
         // Sort variants with proper size ordering
         const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-        
+
         merchItems.forEach(item => {
             item.variants.sort((a, b) => {
                 // First sort by type
@@ -58,16 +58,16 @@ export async function GET(request: NextRequest) {
                 if (typeA !== typeB) {
                     return typeA.localeCompare(typeB);
                 }
-                
+
                 // Then sort by size using proper order
                 const sizeIndexA = sizeOrder.indexOf(a.size.toUpperCase());
                 const sizeIndexB = sizeOrder.indexOf(b.size.toUpperCase());
-                
+
                 // If size found in order array, use that position
                 if (sizeIndexA !== -1 && sizeIndexB !== -1) {
                     return sizeIndexA - sizeIndexB;
                 }
-                
+
                 // If one or both sizes not in array, fall back to alphabetical
                 return a.size.localeCompare(b.size);
             });
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { tourId, name, description, imageUrl, variants } = body;
+        const { tourId, name, description, imageUrl, category, variants } = body;
 
         if (!tourId || !name || !variants || variants.length === 0) {
             return NextResponse.json(
@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
                 name,
                 description,
                 imageUrl,
+                category,
                 tourId,
                 variants: {
                     create: variants.map((v: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -249,7 +250,7 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { id, name, description, imageUrl, variants } = body;
+        const { id, name, description, imageUrl, category, variants } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Merch item ID is required' }, { status: 400 });
@@ -279,6 +280,7 @@ export async function PUT(request: NextRequest) {
                 ...(name && { name }),
                 ...(description !== undefined && { description }),
                 ...(imageUrl !== undefined && { imageUrl }),
+                ...(category !== undefined && { category }),
             },
             include: {
                 variants: true,
@@ -314,7 +316,7 @@ export async function PUT(request: NextRequest) {
         if (finalItem) {
             // Sort variants with proper size ordering
             const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-            
+
             finalItem.variants.sort((a, b) => {
                 // First sort by type
                 const typeA = a.type || '';
@@ -322,16 +324,16 @@ export async function PUT(request: NextRequest) {
                 if (typeA !== typeB) {
                     return typeA.localeCompare(typeB);
                 }
-                
+
                 // Then sort by size using proper order
                 const sizeIndexA = sizeOrder.indexOf(a.size.toUpperCase());
                 const sizeIndexB = sizeOrder.indexOf(b.size.toUpperCase());
-                
+
                 // If size found in order array, use that position
                 if (sizeIndexA !== -1 && sizeIndexB !== -1) {
                     return sizeIndexA - sizeIndexB;
                 }
-                
+
                 // If one or both sizes not in array, fall back to alphabetical
                 return a.size.localeCompare(b.size);
             });
