@@ -26,6 +26,7 @@
     "@auth0/nextjs-auth0": "^4.0.0",
     "@prisma/client": "^5.22.0",
     "@vercel/blob": "^0.27.0",
+    "@vercel/speed-insights": "^1.2.0",
     "date-fns": "^4.1.0",
     "next": "16.0.3",
     "react": "^19.0.0",
