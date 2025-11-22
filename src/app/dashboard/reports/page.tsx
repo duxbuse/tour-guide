@@ -388,12 +388,12 @@ export default function ReportsPage() {
 
     return (
         <div className="animate-fade-in">
-            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <header className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1>Reports & Analytics</h1>
                     <p>Export and analyze your tour data</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="header-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className="btn btn-secondary" onClick={handleExportCSV}>
                         📊 Export CSV
                     </button>
@@ -611,17 +611,21 @@ export default function ReportsPage() {
                                                 <div style={{
                                                     display: 'flex',
                                                     justifyContent: 'space-between',
-                                                    alignItems: 'center',
+                                                    alignItems: 'flex-start',
                                                     marginBottom: '1rem',
                                                     paddingBottom: '0.5rem',
-                                                    borderBottom: `1px solid var(--border-subtle)`
+                                                    borderBottom: `1px solid var(--border-subtle)`,
+                                                    gap: '1rem'
                                                 }}>
-                                                    <div>
+                                                    <div style={{ flex: '1', minWidth: 0 }}>
                                                         <h3 style={{
                                                             fontSize: '1.125rem',
                                                             fontWeight: '700',
                                                             color: 'var(--text-primary)',
-                                                            margin: '0 0 0.25rem 0'
+                                                            margin: '0 0 0.25rem 0',
+                                                            wordWrap: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            hyphens: 'auto'
                                                         }}>
                                                             #{index + 1} {item.name}
                                                         </h3>
@@ -632,7 +636,7 @@ export default function ReportsPage() {
                                                             {item.variants.length} variant{item.variants.length !== 1 ? 's' : ''}
                                                         </div>
                                                     </div>
-                                                    <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                                         <div style={{
                                                             fontSize: '1.25rem',
                                                             fontWeight: '700',

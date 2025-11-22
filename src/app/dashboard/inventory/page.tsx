@@ -107,7 +107,7 @@ export default function InventoryPage() {
 
     useEffect(() => {
         fetchTours();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -332,7 +332,7 @@ export default function InventoryPage() {
                     const variantRecords = inventoryRecords.filter(r => r.variantId === variant.id);
                     let currentCount = variant.quantity;
                     let lastShowDate = 'Initial Stock';
-                    
+
                     if (variantRecords.length > 0) {
                         const sortedRecords = variantRecords.sort((a, b) =>
                             new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
@@ -424,12 +424,12 @@ export default function InventoryPage() {
 
     return (
         <div className="animate-fade-in">
-            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <header className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1>Inventory</h1>
                     <p>Manage your merchandise items and variants</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="header-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                     {merchItems.length > 0 && (
                         <button
                             className="btn btn-secondary"
@@ -483,7 +483,7 @@ export default function InventoryPage() {
                                 // Get the most recent inventory count for this variant
                                 const variantRecords = inventoryRecords.filter(r => r.variantId === v.id);
                                 let latestCount = v.quantity;
-                                
+
                                 if (variantRecords.length > 0) {
                                     const sortedRecords = variantRecords.sort((a, b) =>
                                         new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
@@ -491,7 +491,7 @@ export default function InventoryPage() {
                                     const mostRecentRecord = sortedRecords[0];
                                     latestCount = mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? v.quantity;
                                 }
-                                
+
                                 return vSum + (v.price * latestCount);
                             }, 0), 0
                         ).toFixed(2)}
@@ -555,7 +555,7 @@ export default function InventoryPage() {
                                             );
 
                                             const mostRecentRecord = sortedRecords[0];
-                                            
+
                                             // Use end count if available, otherwise start count, otherwise base quantity
                                             return mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? variant.quantity;
                                         };
@@ -744,24 +744,24 @@ export default function InventoryPage() {
                                             style={{ flex: 1 }}
                                         />
                                         <input
-                                             type="text"
-                                             className="form-input"
-                                             placeholder="Type (optional)"
-                                             value={variant.type}
-                                             onChange={(e) => updateVariant(index, 'type', e.target.value)}
-                                             style={{ flex: 1 }}
-                                         />
-                                         <input
-                                             type="number"
-                                             min="0"
-                                             className="form-input"
-                                             placeholder="Quantity"
-                                             value={variant.quantity}
-                                             onChange={(e) => updateVariant(index, 'quantity', e.target.value)}
-                                             style={{ flex: 1 }}
-                                         />
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Type (optional)"
+                                            value={variant.type}
+                                            onChange={(e) => updateVariant(index, 'type', e.target.value)}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className="form-input"
+                                            placeholder="Quantity"
+                                            value={variant.quantity}
+                                            onChange={(e) => updateVariant(index, 'quantity', e.target.value)}
+                                            style={{ flex: 1 }}
+                                        />
 
-                                         {variants.length > 1 && (
+                                        {variants.length > 1 && (
                                             <button
                                                 type="button"
                                                 className="btn btn-secondary"
@@ -843,7 +843,7 @@ export default function InventoryPage() {
                                         // Find previous shows for this tour, sorted by date
                                         const currentTour = tours.find(t => t.id === selectedTourId);
                                         const selectedShow = currentTour?.shows.find(s => s.id === selectedShowId);
-                                        
+
                                         if (!currentTour || !selectedShow) return variant.quantity;
 
                                         const previousShows = (currentTour.shows || [])
@@ -946,12 +946,12 @@ export default function InventoryPage() {
                                                             style={{ fontSize: '0.875rem', padding: '0.75rem' }}
                                                         />
                                                     </div>
-                                                    
+
                                                     {/* Calculate and display sold count */}
                                                     {(() => {
                                                         const startCount = existingRecord?.startCount;
                                                         const endCount = existingRecord?.endCount;
-                                                        
+
                                                         // Only show if we have both counts
                                                         if (startCount !== null && startCount !== undefined &&
                                                             endCount !== null && endCount !== undefined) {
