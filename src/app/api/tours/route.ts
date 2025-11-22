@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
+import { apiCache, createCacheKey, TOURS_CACHE_TTL } from '@/lib/cache';
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+    const startTime = Date.now();
+    console.log('🚀 Tours API: Starting request');
+    
     try {
+        const authStart = Date.now();
         const session = await auth0.getSession();
+        console.log(`⏱️ Tours API: Auth took ${Date.now() - authStart}ms`);
 
         let auth0User = session?.user;
 
@@ -23,87 +29,142 @@ export async function GET(_request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Find user in DB - try auth0Id first, then email
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
+        // Use optimized user lookup
+        const userStart = Date.now();
+        const user = await findOrCreateUser(auth0User);
+        console.log(`⏱️ Tours API: User lookup took ${Date.now() - userStart}ms`);
 
-        if (!user) {
-            user = await db.user.findUnique({
-                where: { email: auth0User.email || 'manager@test.com' }
-            });
-            
-            // If found by email, update the auth0Id
-            if (user) {
-                user = await db.user.update({
-                    where: { id: user.id },
-                    data: { auth0Id: auth0User.sub }
-                });
-            } else {
-                // Only create if truly not found
-                try {
-                    user = await db.user.create({
-                        data: {
-                            auth0Id: auth0User.sub,
-                            email: auth0User.email || 'manager@test.com',
-                            name: auth0User.name || 'Tour Manager',
-                            role: 'MANAGER'
-                        }
-                    });
-                } catch (e) {
-                    // If unique constraint fails, try finding again
-                    if (e && typeof e === 'object' && 'code' in e && e.code === 'P2002') {
-                        user = await db.user.findFirst({
-                            where: {
-                                OR: [
-                                    { auth0Id: auth0User.sub },
-                                    { email: auth0User.email || 'manager@test.com' }
-                                ]
-                            }
-                        });
-                    } else {
-                        throw e;
-                    }
-                }
-            }
+        // Check if client wants detailed data or just summary
+        const { searchParams } = new URL(request.url);
+        const includeShows = searchParams.get('includeShows') === 'true';
+        const includeInventory = searchParams.get('includeInventory') === 'true';
+
+        // Create cache key based on requested data
+        const cacheKey = createCacheKey('tours', user.id, includeShows.toString(), includeInventory.toString());
+        
+        // Check cache first
+        const cacheStart = Date.now();
+        const cachedResult = apiCache.get(cacheKey);
+        console.log(`⏱️ Tours API: Cache check took ${Date.now() - cacheStart}ms`);
+        if (cachedResult) {
+            console.log(`🎯 Tours API: Cache hit! Total time: ${Date.now() - startTime}ms`);
+            return NextResponse.json(cachedResult);
         }
 
-        if (!user) {
-            // Optionally create user if they don't exist yet (first login sync)
-            // For now, return 401 or 404
-            return NextResponse.json({ error: 'User not found in database' }, { status: 401 });
-        }
+        // Skip the updateMany operation entirely for read requests - handle this in a background job or separate endpoint
+        // This was causing significant delay
 
-        // First update any tours that should be inactive based on end date
-        const currentDate = new Date();
-        await db.tour.updateMany({
-            where: {
-                managerId: user.id,
-                endDate: {
-                    lt: currentDate
+        // Super fast basic query - just tours with counts (default case)
+        if (!includeShows && !includeInventory) {
+            // Most minimal query possible for fast loading
+            const tours = await db.tour.findMany({
+                where: { managerId: user.id },
+                select: {
+                    id: true,
+                    name: true,
+                    startDate: true,
+                    endDate: true,
+                    isActive: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    _count: {
+                        select: { shows: true, merchItems: true },
+                    },
                 },
-                isActive: true
-            },
-            data: {
-                isActive: false
-            }
-        });
+                orderBy: [
+                    { isActive: 'desc' },
+                    { updatedAt: 'desc' }
+                ],
+            });
 
+            // Cache the result for future requests
+            apiCache.set(cacheKey, tours, TOURS_CACHE_TTL);
+            return NextResponse.json(tours);
+        }
+
+        // Optimized shows query - limit to essential fields only
+        if (includeShows && !includeInventory) {
+            const queryStart = Date.now();
+            const tours = await db.tour.findMany({
+                where: { managerId: user.id },
+                include: {
+                    shows: {
+                        orderBy: { date: 'asc' },
+                        select: {
+                            id: true,
+                            name: true,
+                            date: true,
+                            venue: true,
+                            ticketsSold: true,
+                            totalTickets: true
+                        }
+                    },
+                    _count: {
+                        select: { shows: true, merchItems: true },
+                    },
+                },
+                orderBy: [
+                    { isActive: 'desc' },
+                    { updatedAt: 'desc' }
+                ],
+            });
+            console.log(`⏱️ Tours API: Shows query took ${Date.now() - queryStart}ms`);
+
+            // Cache the result for future requests
+            apiCache.set(cacheKey, tours, TOURS_CACHE_TTL);
+            console.log(`✅ Tours API: With shows total time ${Date.now() - startTime}ms`);
+            return NextResponse.json(tours);
+        }
+
+        // Full query with inventory (only when specifically requested)
+        const queryStart = Date.now();
         const tours = await db.tour.findMany({
             where: { managerId: user.id },
             include: {
                 shows: {
                     orderBy: { date: 'asc' },
+                    select: {
+                        id: true,
+                        name: true,
+                        date: true,
+                        venue: true,
+                        ticketsSold: true,
+                        totalTickets: true,
+                        inventoryRecords: {
+                            include: {
+                                variant: {
+                                    select: {
+                                        id: true,
+                                        size: true,
+                                        type: true,
+                                        price: true,
+                                        quantity: true,
+                                        merchItem: {
+                                            select: {
+                                                id: true,
+                                                name: true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 _count: {
                     select: { shows: true, merchItems: true },
                 },
             },
             orderBy: [
-                { isActive: 'desc' }, // Active tours first
-                { createdAt: 'desc' }  // Then by creation date
+                { isActive: 'desc' },
+                { updatedAt: 'desc' }
             ],
         });
+        console.log(`⏱️ Tours API: Full inventory query took ${Date.now() - queryStart}ms`);
+
+        // Cache the result for future requests
+        apiCache.set(cacheKey, tours, TOURS_CACHE_TTL);
+        console.log(`✅ Tours API: Full query total time ${Date.now() - startTime}ms`);
 
         return NextResponse.json(tours);
     } catch (error) {
@@ -133,39 +194,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            // For manager user fallback, try to find by email first to avoid conflicts
-            if (auth0User.sub === 'auth0|691f989d2bc713054fec2340') {
-                user = await db.user.findUnique({
-                    where: { email: 'manager@test.com' }
-                });
-                
-                // If found by email, update any auth0Id mismatches
-                if (user && user.auth0Id !== auth0User.sub) {
-                    user = await db.user.update({
-                        where: { id: user.id },
-                        data: { auth0Id: auth0User.sub }
-                    });
-                }
-            }
-            
-            // If still no user found, create a new one
-            if (!user) {
-                user = await db.user.create({
-                    data: {
-                        auth0Id: auth0User.sub,
-                        email: auth0User.email || 'manager@test.com',
-                        name: auth0User.name || 'Tour Manager',
-                        role: 'MANAGER'
-                    }
-                });
-            }
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         const body = await request.json();
         const { name, startDate, endDate } = body;
@@ -193,6 +223,13 @@ export async function POST(request: NextRequest) {
                     select: { shows: true, merchItems: true },
                 },
             },
+        });
+
+        // Invalidate relevant caches
+        const baseKeys = ['tours', 'dashboard'];
+        baseKeys.forEach(prefix => {
+            const keys = apiCache.getStats().keys.filter(key => key.startsWith(`${prefix}:${user.id}`));
+            keys.forEach(key => apiCache.delete(key));
         });
 
         return NextResponse.json(tour, { status: 201 });
@@ -223,39 +260,8 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            // For demo user, try to find by email first to avoid conflicts
-            if (auth0User.sub === 'demo-user') {
-                user = await db.user.findUnique({
-                    where: { email: 'demo@example.com' }
-                });
-                
-                // If found by email, update the auth0Id to match
-                if (user) {
-                    user = await db.user.update({
-                        where: { id: user.id },
-                        data: { auth0Id: 'demo-user' }
-                    });
-                }
-            }
-            
-            // If still no user found, create a new one
-            if (!user) {
-                user = await db.user.create({
-                    data: {
-                        auth0Id: auth0User.sub,
-                        email: auth0User.email || 'demo@example.com',
-                        name: auth0User.name || 'Demo User',
-                        role: 'MANAGER'
-                    }
-                });
-            }
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         const body = await request.json();
         const { id, name, startDate, endDate } = body;
@@ -299,6 +305,13 @@ export async function PUT(request: NextRequest) {
             },
         });
 
+        // Invalidate relevant caches
+        const baseKeys = ['tours', 'dashboard'];
+        baseKeys.forEach(prefix => {
+            const keys = apiCache.getStats().keys.filter(key => key.startsWith(`${prefix}:${user.id}`));
+            keys.forEach(key => apiCache.delete(key));
+        });
+
         return NextResponse.json(updatedTour);
     } catch (error) {
         console.error('Error updating tour:', error);
@@ -327,39 +340,8 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            // For demo user, try to find by email first to avoid conflicts
-            if (auth0User.sub === 'demo-user') {
-                user = await db.user.findUnique({
-                    where: { email: 'demo@example.com' }
-                });
-                
-                // If found by email, update the auth0Id to match
-                if (user) {
-                    user = await db.user.update({
-                        where: { id: user.id },
-                        data: { auth0Id: 'demo-user' }
-                    });
-                }
-            }
-            
-            // If still no user found, create a new one
-            if (!user) {
-                user = await db.user.create({
-                    data: {
-                        auth0Id: auth0User.sub,
-                        email: auth0User.email || 'demo@example.com',
-                        name: auth0User.name || 'Demo User',
-                        role: 'MANAGER'
-                    }
-                });
-            }
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         const { searchParams } = new URL(request.url);
         const tourId = searchParams.get('id');
@@ -383,6 +365,13 @@ export async function DELETE(request: NextRequest) {
         // Delete the tour (shows and merch items will be deleted by cascade)
         await db.tour.delete({
             where: { id: tourId },
+        });
+
+        // Invalidate relevant caches
+        const baseKeys = ['tours', 'dashboard'];
+        baseKeys.forEach(prefix => {
+            const keys = apiCache.getStats().keys.filter(key => key.startsWith(`${prefix}:${user.id}`));
+            keys.forEach(key => apiCache.delete(key));
         });
 
         return NextResponse.json({ message: 'Tour deleted successfully' });

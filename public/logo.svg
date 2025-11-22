@@ -1,0 +1,22 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logo_gradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+  </defs>
+  <!-- Guitar Body Outline -->
+  <path d="M20 38C25.5228 38 30 33.5228 30 28C30 25.2 28.8 22.7 26.9 20.9C28.2 19.6 29 17.9 29 16C29 11.0294 24.9706 7 20 7C15.0294 7 11 11.0294 11 16C11 17.9 11.8 19.6 13.1 20.9C11.2 22.7 10 25.2 10 28C10 33.5228 14.4772 38 20 38Z" stroke="url(#logo_gradient)" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Guitar Neck -->
+  <path d="M20 7V2" stroke="url(#logo_gradient)" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Sound Hole -->
+  <circle cx="20" cy="26" r="3.5" fill="url(#logo_gradient)" fill-opacity="0.2" stroke="url(#logo_gradient)" stroke-width="1.5"/>
+  <!-- Strings -->
+  <path d="M18.5 2V32" stroke="url(#logo_gradient)" stroke-width="1" stroke-opacity="0.8"/>
+  <path d="M20 2V32" stroke="url(#logo_gradient)" stroke-width="1" stroke-opacity="0.8"/>
+  <path d="M21.5 2V32" stroke="url(#logo_gradient)" stroke-width="1" stroke-opacity="0.8"/>
+  <!-- Bridge -->
+  <path d="M17 32H23" stroke="url(#logo_gradient)" stroke-width="2" stroke-linecap="round"/>
+  <!-- Headstock details -->
+  <path d="M17 2H23" stroke="url(#logo_gradient)" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

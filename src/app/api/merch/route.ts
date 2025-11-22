@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 
 export async function GET(request: NextRequest) {
@@ -17,21 +17,8 @@ export async function GET(request: NextRequest) {
             };
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
-            });
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         const { searchParams } = new URL(request.url);
         const tourId = searchParams.get('tourId');
@@ -115,21 +102,8 @@ export async function POST(request: NextRequest) {
             };
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
-            });
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         // Check if user has manager role for creating items
         const userRoles = getUserRoles(auth0User);
@@ -203,21 +177,8 @@ export async function DELETE(request: NextRequest) {
             };
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
-            });
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         // Check if user has manager role for deleting items
         const userRoles = getUserRoles(auth0User);
@@ -275,21 +236,8 @@ export async function PUT(request: NextRequest) {
             };
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
-            });
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         // Check if user has permission to edit quantities (manager or seller)
         const userRoles = getUserRoles(auth0User);

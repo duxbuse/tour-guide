@@ -2,6 +2,59 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ tourId: string }> }
+) {
+    try {
+        const session = await auth0.getSession();
+
+        if (!session || !session.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const user = await db.user.findUnique({
+            where: { auth0Id: session.user.sub }
+        });
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found in database' }, { status: 401 });
+        }
+
+        const { tourId } = await params;
+
+        // Verify tour belongs to user
+        const tour = await db.tour.findFirst({
+            where: {
+                id: tourId,
+                managerId: user.id,
+            },
+        });
+
+        if (!tour) {
+            return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
+        }
+
+        const shows = await db.show.findMany({
+            where: { tourId },
+            orderBy: { date: 'asc' },
+            select: {
+                id: true,
+                name: true,
+                date: true,
+                venue: true,
+                ticketsSold: true,
+                totalTickets: true
+            }
+        });
+
+        return NextResponse.json(shows);
+    } catch (error) {
+        console.error('Error fetching shows:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ tourId: string }> }
@@ -165,6 +218,7 @@ export async function PUT(
                 name,
                 date: new Date(date),
                 venue,
+                tourId,
             },
         });
 

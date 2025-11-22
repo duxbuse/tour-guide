@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { auth0 } from '@/lib/auth0';
+import { ToursSkeleton } from '@/components/LoadingSkeleton';
+import DropdownMenu from '@/components/DropdownMenu';
 
 interface Show {
     id: string;
@@ -36,7 +38,12 @@ export default function ToursPage() {
     const [editingTourId, setEditingTourId] = useState<string | null>(null);
     const [editingTourName, setEditingTourName] = useState('');
     const [openOptionsMenu, setOpenOptionsMenu] = useState<string | null>(null);
+    const [openShowMenu, setOpenShowMenu] = useState<string | null>(null);
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    // Refs for dropdown triggers
+    const tourMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+    const showMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
     useEffect(() => {
         // Get current user from auth service
@@ -84,7 +91,8 @@ export default function ToursPage() {
 
     const fetchTours = async () => {
         try {
-            const response = await fetch('/api/tours');
+            // First load tours with shows for display
+            const response = await fetch('/api/tours?includeShows=true');
             if (response.ok) {
                 const data = await response.json();
                 setTours(data);
@@ -128,12 +136,12 @@ export default function ToursPage() {
         const selectedTour = tours.find(tour => tour.id === selectedTourId);
         if (selectedTour && newShow.date) {
             const showDate = new Date(newShow.date);
-            
+
             if (selectedTour.startDate && showDate < new Date(selectedTour.startDate)) {
                 alert(`Show date must be after the tour start date (${selectedTour.startDate})`);
                 return;
             }
-            
+
             if (selectedTour.endDate && showDate > new Date(selectedTour.endDate)) {
                 alert(`Show date must be before the tour end date (${selectedTour.endDate})`);
                 return;
@@ -153,7 +161,7 @@ export default function ToursPage() {
                 const show = await response.json();
                 setTours(tours.map(tour =>
                     tour.id === selectedTourId
-                        ? { ...tour, shows: [...tour.shows, show] }
+                        ? { ...tour, shows: [...(tour.shows || []), show] }
                         : tour
                 ));
                 setShowNewShowModal(false);
@@ -238,18 +246,6 @@ export default function ToursPage() {
         setOpenOptionsMenu(openOptionsMenu === tourId ? null : tourId);
     };
 
-    // Close options menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = () => {
-            setOpenOptionsMenu(null);
-        };
-        
-        if (openOptionsMenu) {
-            document.addEventListener('click', handleClickOutside);
-            return () => document.removeEventListener('click', handleClickOutside);
-        }
-    }, [openOptionsMenu]);
-
     const openAddShowModal = (tourId: string) => {
         setSelectedTourId(tourId);
         setShowNewShowModal(true);
@@ -274,12 +270,12 @@ export default function ToursPage() {
         const selectedTour = tours.find(tour => tour.id === selectedTourId);
         if (selectedTour && editShow.date) {
             const showDate = new Date(editShow.date);
-            
+
             if (selectedTour.startDate && showDate < new Date(selectedTour.startDate)) {
                 alert(`Show date must be after the tour start date (${selectedTour.startDate})`);
                 return;
             }
-            
+
             if (selectedTour.endDate && showDate > new Date(selectedTour.endDate)) {
                 alert(`Show date must be before the tour end date (${selectedTour.endDate})`);
                 return;
@@ -301,10 +297,10 @@ export default function ToursPage() {
                     tour.id === selectedTourId
                         ? {
                             ...tour,
-                            shows: tour.shows.map(show =>
+                            shows: (tour.shows || []).map(show =>
                                 show.id === editingShow.id ? updatedShow : show
                             )
-                          }
+                        }
                         : tour
                 ));
                 setShowEditShowModal(false);
@@ -336,7 +332,7 @@ export default function ToursPage() {
             if (response.ok) {
                 setTours(tours.map(tour =>
                     tour.id === tourId
-                        ? { ...tour, shows: tour.shows.filter(s => s.id !== show.id) }
+                        ? { ...tour, shows: (tour.shows || []).filter(s => s.id !== show.id) }
                         : tour
                 ));
             } else {
@@ -350,11 +346,7 @@ export default function ToursPage() {
     };
 
     if (loading) {
-        return (
-            <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
-                <p>Loading tours...</p>
-            </div>
-        );
+        return <ToursSkeleton />;
     }
 
     return (
@@ -430,27 +422,19 @@ export default function ToursPage() {
                                             {tour.startDate && format(new Date(tour.startDate), 'MMM d, yyyy')} - {tour.endDate && format(new Date(tour.endDate), 'MMM d, yyyy')}
                                         </span>
                                         <span>•</span>
-                                        <span>{tour.shows.length} shows</span>
+                                        <span>{tour.shows?.length || 0} shows</span>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
                                     <span className={`badge ${tour.isActive ? 'badge-success' : 'badge-warning'}`}>
                                         {tour.isActive ? 'Active' : 'Finished'}
                                     </span>
-                                    {isManager && (
-                                        <button
-                                            className="btn btn-secondary"
-                                            style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-                                            onClick={() => openAddShowModal(tour.id)}
-                                        >
-                                            + Add Show
-                                        </button>
-                                    )}
-                                    
+
                                     {/* Three-dots options menu - only for managers */}
                                     {isManager && (
                                         <div style={{ position: 'relative' }}>
                                             <button
+                                                ref={el => { tourMenuRefs.current[tour.id] = el; }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     toggleOptionsMenu(tour.id);
@@ -476,50 +460,66 @@ export default function ToursPage() {
                                             >
                                                 ⋯
                                             </button>
-                                            
-                                            {openOptionsMenu === tour.id && (
-                                                <div style={{
-                                                    position: 'absolute',
-                                                    top: '100%',
-                                                    right: 0,
-                                                    background: 'var(--bg-card)',
-                                                    border: '1px solid var(--border-subtle)',
-                                                    borderRadius: 'var(--radius-md)',
-                                                    padding: '0.5rem 0',
-                                                    minWidth: '150px',
-                                                    zIndex: 1000,
-                                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-                                                }}>
-                                                    <button
-                                                        onClick={() => handleDeleteTour(tour.id)}
-                                                        style={{
-                                                            width: '100%',
-                                                            padding: '0.75rem 1rem',
-                                                            background: 'transparent',
-                                                            border: 'none',
-                                                            textAlign: 'left',
-                                                            color: '#ef4444',
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.875rem',
-                                                            transition: 'background 0.2s ease'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.background = 'transparent';
-                                                        }}
-                                                    >
-                                                        🗑️ Delete Tour
-                                                    </button>
-                                                </div>
-                                            )}
+
+                                            <DropdownMenu
+                                                isOpen={openOptionsMenu === tour.id}
+                                                onClose={() => setOpenOptionsMenu(null)}
+                                                triggerRef={{ current: tourMenuRefs.current[tour.id] }}
+                                            >
+                                                <button
+                                                    onClick={() => {
+                                                        openAddShowModal(tour.id);
+                                                        setOpenOptionsMenu(null);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem 1rem',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        textAlign: 'left',
+                                                        color: 'var(--text-primary)',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.875rem',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    + Add Show
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteTour(tour.id)}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem 1rem',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        textAlign: 'left',
+                                                        color: '#ef4444',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.875rem',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    🗑️ Delete Tour
+                                                </button>
+                                            </DropdownMenu>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            {tour.shows.length > 0 && (
+                            {(tour.shows?.length || 0) > 0 && (
                                 <div className="table-container" style={{ marginTop: '1rem' }}>
                                     <table className="table">
                                         <thead>
@@ -531,28 +531,93 @@ export default function ToursPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {tour.shows.map((show) => (
+                                            {(tour.shows || []).map((show) => (
                                                 <tr key={show.id}>
                                                     <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{show.name}</td>
                                                     <td>{format(new Date(show.date), 'MMM d, yyyy')}</td>
                                                     <td>{show.venue || '-'}</td>
                                                     {isManager && (
                                                         <td>
-                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <div style={{ position: 'relative' }}>
                                                                 <button
-                                                                    className="btn btn-secondary"
-                                                                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
-                                                                    onClick={() => openEditShowModal(show, tour.id)}
+                                                                    ref={el => { showMenuRefs.current[show.id] = el; }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setOpenShowMenu(openShowMenu === show.id ? null : show.id);
+                                                                        setOpenOptionsMenu(null); // Close other menus
+                                                                    }}
+                                                                    style={{
+                                                                        background: 'transparent',
+                                                                        border: 'none',
+                                                                        color: 'var(--text-secondary)',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '1.25rem',
+                                                                        padding: '0.25rem 0.5rem',
+                                                                        borderRadius: '4px',
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                                                                        e.currentTarget.style.color = 'var(--text-primary)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.background = 'transparent';
+                                                                        e.currentTarget.style.color = 'var(--text-secondary)';
+                                                                    }}
                                                                 >
-                                                                    Edit
+                                                                    ⋯
                                                                 </button>
-                                                                <button
-                                                                    className="btn btn-danger"
-                                                                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
-                                                                    onClick={() => handleDeleteShow(show, tour.id)}
+
+                                                                <DropdownMenu
+                                                                    isOpen={openShowMenu === show.id}
+                                                                    onClose={() => setOpenShowMenu(null)}
+                                                                    triggerRef={{ current: showMenuRefs.current[show.id] }}
                                                                 >
-                                                                    Delete
-                                                                </button>
+                                                                    <button
+                                                                        onClick={() => openEditShowModal(show, tour.id)}
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            padding: '0.5rem 1rem',
+                                                                            background: 'transparent',
+                                                                            border: 'none',
+                                                                            textAlign: 'left',
+                                                                            color: 'var(--text-primary)',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '0.875rem',
+                                                                            transition: 'background 0.2s ease'
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            e.currentTarget.style.background = 'transparent';
+                                                                        }}
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteShow(show, tour.id)}
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            padding: '0.5rem 1rem',
+                                                                            background: 'transparent',
+                                                                            border: 'none',
+                                                                            textAlign: 'left',
+                                                                            color: '#ef4444',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '0.875rem',
+                                                                            transition: 'background 0.2s ease'
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            e.currentTarget.style.background = 'transparent';
+                                                                        }}
+                                                                    >
+                                                                        Delete
+                                                                    </button>
+                                                                </DropdownMenu>
                                                             </div>
                                                         </td>
                                                     )}
@@ -563,7 +628,7 @@ export default function ToursPage() {
                                 </div>
                             )}
 
-                            {tour.shows.length === 0 && (
+                            {(!tour.shows || tour.shows.length === 0) && (
                                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                     <p>No shows scheduled yet. Add your first show to this tour.</p>
                                 </div>
@@ -657,7 +722,7 @@ export default function ToursPage() {
                                     // Convert dates to YYYY-MM-DD format for HTML5 date inputs
                                     const minDate = selectedTour?.startDate ? selectedTour.startDate.split('T')[0] : '';
                                     const maxDate = selectedTour?.endDate ? selectedTour.endDate.split('T')[0] : '';
-                                    
+
                                     return (
                                         <>
                                             <label className="form-label">Date</label>
@@ -753,7 +818,7 @@ export default function ToursPage() {
                                     // Convert dates to YYYY-MM-DD format for HTML5 date inputs
                                     const minDate = selectedTour?.startDate ? selectedTour.startDate.split('T')[0] : '';
                                     const maxDate = selectedTour?.endDate ? selectedTour.endDate.split('T')[0] : '';
-                                    
+
                                     return (
                                         <>
                                             <label className="form-label">Date</label>

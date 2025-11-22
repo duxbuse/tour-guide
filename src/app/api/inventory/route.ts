@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 
 // Helper function to check user roles
@@ -25,21 +25,8 @@ export async function GET(request: NextRequest) {
             };
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
-            });
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         const { searchParams } = new URL(request.url);
         const showId = searchParams.get('showId');
@@ -141,21 +128,8 @@ export async function POST(request: NextRequest) {
             };
         }
 
-        // Find or create user in DB
-        let user = await db.user.findUnique({
-            where: { auth0Id: auth0User.sub }
-        });
-
-        if (!user) {
-            user = await db.user.create({
-                data: {
-                    auth0Id: auth0User.sub,
-                    email: auth0User.email || 'demo@example.com',
-                    name: auth0User.name || 'Demo User',
-                    role: 'MANAGER'
-                }
-            });
-        }
+        // Use optimized user lookup
+        const user = await findOrCreateUser(auth0User);
 
         // Check if user has permission (manager or seller)
         const userRoles = getUserRoles(auth0User);
