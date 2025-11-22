@@ -5,8 +5,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import UserInfo from './UserInfo';
 
+interface User {
+    sub: string;
+    email?: string;
+    name?: string;
+    picture?: string;
+}
+
 interface ResponsiveNavBarProps {
-    user: any;
+    user: User | null;
 }
 
 export default function ResponsiveNavBar({ user }: ResponsiveNavBarProps) {
