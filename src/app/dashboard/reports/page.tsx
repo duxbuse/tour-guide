@@ -54,6 +54,8 @@ export default function ReportsPage() {
     const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
 
+    const [showsLoading, setShowsLoading] = useState(false);
+
     useEffect(() => {
         // Get current user from auth service
         const fetchUser = async () => {
@@ -64,11 +66,12 @@ export default function ReportsPage() {
         };
         fetchUser();
         fetchTours();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         if (selectedTourId) {
+            fetchShows(selectedTourId);
             fetchInventoryRecords(selectedTourId);
         }
     }, [selectedTourId]);
@@ -101,6 +104,25 @@ export default function ReportsPage() {
         }
     };
 
+    const fetchShows = async (tourId: string) => {
+        setShowsLoading(true);
+        try {
+            const response = await fetch(`/api/tours/${tourId}/shows`);
+            if (response.ok) {
+                const shows = await response.json();
+                setTours(prevTours =>
+                    prevTours.map(t =>
+                        t.id === tourId ? { ...t, shows } : t
+                    )
+                );
+            }
+        } catch (error) {
+            console.error('Error fetching shows:', error);
+        } finally {
+            setShowsLoading(false);
+        }
+    };
+
     const fetchInventoryRecords = async (tourId: string) => {
         try {
             const response = await fetch(`/api/inventory?tourId=${tourId}`);
@@ -118,7 +140,7 @@ export default function ReportsPage() {
     // Calculate shrinkage (lost/damaged items) between shows
     const calculateShrinkage = () => {
         if (!selectedTour) return [];
-        
+
         interface ShrinkageItem {
             item: string;
             variant: string;
@@ -129,9 +151,9 @@ export default function ReportsPage() {
             shrinkage: number;
             value: number;
         }
-        
+
         const shrinkageData: ShrinkageItem[] = [];
-        
+
         // Group records by variant
         const recordsByVariant = inventoryRecords.reduce((acc, record) => {
             const key = record.variantId;
@@ -140,7 +162,7 @@ export default function ReportsPage() {
             return acc;
         }, {} as Record<string, InventoryRecord[]>);
 
-        Object.entries(recordsByVariant).forEach(([ , variantRecords]) => {
+        Object.entries(recordsByVariant).forEach(([, variantRecords]) => {
             // Sort by show date
             const sortedRecords = variantRecords.sort((a, b) =>
                 new Date(a.show.date).getTime() - new Date(b.show.date).getTime()
@@ -182,7 +204,7 @@ export default function ReportsPage() {
         const shrinkageData = calculateShrinkage();
         const totalShrinkage = shrinkageData.reduce((sum, item) => sum + item.shrinkage, 0);
         const totalShrinkageValue = shrinkageData.reduce((sum, item) => sum + item.value, 0);
-        
+
         const showCount = selectedTour?.shows?.length || 0;
         return {
             totalSold,
@@ -211,7 +233,7 @@ export default function ReportsPage() {
                 const showRevenue = inventoryRecords
                     .filter(r => r.showId === show.id)
                     .reduce((sum, r) => sum + ((r.soldCount || 0) * r.variant.price), 0);
-                
+
                 return {
                     Show: show.name,
                     Date: format(new Date(show.date), 'yyyy-MM-dd'),
@@ -224,7 +246,7 @@ export default function ReportsPage() {
             const worksheet = xlsx.utils.json_to_sheet(data);
             const workbook = xlsx.utils.book_new();
             xlsx.utils.book_append_sheet(workbook, worksheet, "Shows");
-            
+
             // Add shrinkage data if any exists
             if (shrinkageData.length > 0) {
                 const shrinkageSheet = xlsx.utils.json_to_sheet(shrinkageData.map(item => ({
@@ -239,7 +261,7 @@ export default function ReportsPage() {
                 })));
                 xlsx.utils.book_append_sheet(workbook, shrinkageSheet, "Lost_Damaged");
             }
-            
+
             xlsx.writeFile(workbook, `${selectedTour.name.replace(/\s+/g, '_')}_Report.csv`);
         });
     };
@@ -259,7 +281,7 @@ export default function ReportsPage() {
                 const showRevenue = inventoryRecords
                     .filter(r => r.showId === show.id)
                     .reduce((sum, r) => sum + ((r.soldCount || 0) * r.variant.price), 0);
-                
+
                 return {
                     Show: show.name,
                     Date: format(new Date(show.date), 'yyyy-MM-dd'),
@@ -366,7 +388,7 @@ export default function ReportsPage() {
 
     return (
         <div className="animate-fade-in">
-                <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1>Reports & Analytics</h1>
                     <p>Export and analyze your tour data</p>
@@ -449,24 +471,24 @@ export default function ReportsPage() {
                                         </thead>
                                         <tbody>
                                             {(selectedTour.shows || []).map((show) => {
-                                               const showSales = inventoryRecords
-                                                   .filter(r => r.showId === show.id)
-                                                   .reduce((sum, r) => sum + (r.soldCount || 0), 0);
-                                               const showRevenue = inventoryRecords
-                                                   .filter(r => r.showId === show.id)
-                                                   .reduce((sum, r) => sum + ((r.soldCount || 0) * r.variant.price), 0);
-                                               
-                                               return (
-                                                <tr key={show.id}>
-                                                    <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{show.name}</td>
-                                                    <td>{format(new Date(show.date), 'MMM d, yyyy')}</td>
-                                                    <td>{show.venue || '-'}</td>
-                                                    <td style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>
-                                                        ${showRevenue.toFixed(2)}
-                                                    </td>
-                                                    <td>{showSales}</td>
-                                                </tr>
-                                               );
+                                                const showSales = inventoryRecords
+                                                    .filter(r => r.showId === show.id)
+                                                    .reduce((sum, r) => sum + (r.soldCount || 0), 0);
+                                                const showRevenue = inventoryRecords
+                                                    .filter(r => r.showId === show.id)
+                                                    .reduce((sum, r) => sum + ((r.soldCount || 0) * r.variant.price), 0);
+
+                                                return (
+                                                    <tr key={show.id}>
+                                                        <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{show.name}</td>
+                                                        <td>{format(new Date(show.date), 'MMM d, yyyy')}</td>
+                                                        <td>{show.venue || '-'}</td>
+                                                        <td style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>
+                                                            ${showRevenue.toFixed(2)}
+                                                        </td>
+                                                        <td>{showSales}</td>
+                                                    </tr>
+                                                );
                                             })}
                                         </tbody>
                                     </table>
@@ -536,7 +558,7 @@ export default function ReportsPage() {
                                         const itemKey = record.variant.merchItem.id;
                                         const itemName = record.variant.merchItem.name;
                                         const variantKey = `${record.variant.type || 'null'}-${record.variant.size}`;
-                                        
+
                                         if (!acc[itemKey]) {
                                             acc[itemKey] = {
                                                 name: itemName,
@@ -545,7 +567,7 @@ export default function ReportsPage() {
                                                 variants: {}
                                             };
                                         }
-                                        
+
                                         // Initialize variant if not exists
                                         if (!acc[itemKey].variants[variantKey]) {
                                             acc[itemKey].variants[variantKey] = {
@@ -555,14 +577,14 @@ export default function ReportsPage() {
                                                 revenue: 0
                                             };
                                         }
-                                        
+
                                         // Aggregate variant sales across all shows
                                         const soldCount = record.soldCount || 0;
                                         acc[itemKey].totalSold += soldCount;
                                         acc[itemKey].totalRevenue += soldCount * record.variant.price;
                                         acc[itemKey].variants[variantKey].sold += soldCount;
                                         acc[itemKey].variants[variantKey].revenue += soldCount * record.variant.price;
-                                        
+
                                         return acc;
                                     }, {} as Record<string, { name: string; totalSold: number; totalRevenue: number; variants: Record<string, VariantSales> }>);
 
@@ -627,7 +649,7 @@ export default function ReportsPage() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                
+
                                                 {/* Variant breakdown */}
                                                 <div style={{
                                                     display: 'grid',

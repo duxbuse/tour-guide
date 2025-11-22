@@ -57,15 +57,14 @@ export default function UserInfo() {
                 <span className="user-name">{user.name}</span>
                 <span className="user-email">{user.email}</span>
             </div>
-            {user.picture && (
-                <Image
-                    src={user.picture}
-                    alt={user.name || 'User'}
-                    width={32}
-                    height={32}
-                    className="user-avatar"
-                />
-            )}
+            <Image
+                src={user.picture || '/logo-v2.svg'}
+                alt={user.name || 'User'}
+                width={32}
+                height={32}
+                className="user-avatar"
+                style={{ objectFit: 'cover', background: 'var(--bg-secondary)' }}
+            />
             <UserSwitcher />
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/api/auth/logout" className="logout-btn">

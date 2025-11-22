@@ -1,5 +1,6 @@
 import { auth0 } from '@/lib/auth0';
 import Link from 'next/link';
+import Image from 'next/image';
 import UserInfo from './UserInfo';
 
 export async function NavBar() {
@@ -9,8 +10,9 @@ export async function NavBar() {
     return (
         <nav className="navbar">
             <div className="navbar-left">
-                <Link href="/" className="navbar-brand">
-                    🎸 Tour Guide
+                <Link href="/" className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <Image src="/logo.svg" alt="Tour Guide Logo" width={40} height={40} priority />
+                    <span>Tour Guide</span>
                 </Link>
 
                 {user && (
