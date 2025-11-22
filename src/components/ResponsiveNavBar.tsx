@@ -80,8 +80,8 @@ export default function ResponsiveNavBar({ user }: ResponsiveNavBarProps) {
                     <div style={{
                         display: 'flex',
                         justifyContent: 'flex-end',
-                        marginBottom: '1.5rem',
-                        paddingBottom: '1rem',
+                        marginBottom: '0.5rem',
+                        paddingBottom: '0.5rem',
                         borderBottom: '1px solid var(--border-subtle)'
                     }}>
                         <button
@@ -91,7 +91,7 @@ export default function ResponsiveNavBar({ user }: ResponsiveNavBarProps) {
                                 border: '2px solid var(--accent-primary)',
                                 color: 'var(--accent-primary)',
                                 cursor: 'pointer',
-                                padding: '0.75rem',
+                                padding: '0.5rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -110,7 +110,7 @@ export default function ResponsiveNavBar({ user }: ResponsiveNavBarProps) {
                                 e.currentTarget.style.color = 'var(--accent-primary)';
                             }}
                         >
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
                                 <line x1="6" y1="6" x2="18" y2="18"></line>
                             </svg>
