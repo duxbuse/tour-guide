@@ -27,35 +27,31 @@ interface Assignment {
 interface ManageAssignmentsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    tours: Array<{
-        id: string;
-        name: string;
-        shows?: Array<{
-            id: string;
-            name: string;
-            date: string;
-        }>;
-    }>;
+    tourId: string | null;
+    tourName: string | null;
 }
 
 export default function ManageAssignmentsModal({
     isOpen,
     onClose,
-    tours,
+    tourId,
+    tourName,
 }: ManageAssignmentsModalProps) {
     const [sellers, setSellers] = useState<Seller[]>([]);
     const [assignments, setAssignments] = useState<Assignment[]>([]);
+    const [shows, setShows] = useState<Show[]>([]);
     const [selectedSellerId, setSelectedSellerId] = useState('');
     const [selectedShowId, setSelectedShowId] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && tourId) {
             fetchSellers();
             fetchAssignments();
+            fetchShows();
         }
-    }, [isOpen]);
+    }, [isOpen, tourId]);
 
     const fetchSellers = async () => {
         try {
@@ -74,12 +70,32 @@ export default function ManageAssignmentsModal({
         }
     };
 
+    const fetchShows = async () => {
+        if (!tourId) return;
+
+        try {
+            const response = await fetch(`/api/tours/${tourId}/shows`);
+            if (response.ok) {
+                const data = await response.json();
+                setShows(data);
+            }
+        } catch (err) {
+            console.error('Error fetching shows:', err);
+        }
+    };
+
     const fetchAssignments = async () => {
+        if (!tourId) return;
+
         try {
             const response = await fetch('/api/seller-assignments');
             if (response.ok) {
                 const data = await response.json();
-                setAssignments(data);
+                // Filter to only show assignments for this tour
+                const tourAssignments = data.filter((a: Assignment) =>
+                    a.show.tour.id === tourId
+                );
+                setAssignments(tourAssignments);
             }
         } catch (err) {
             console.error('Error fetching assignments:', err);
@@ -137,15 +153,7 @@ export default function ManageAssignmentsModal({
         }
     };
 
-    if (!isOpen) return null;
-
-    // Get all shows from all tours
-    const allShows = tours.flatMap((tour) =>
-        (tour.shows || []).map((show) => ({
-            ...show,
-            tourName: tour.name,
-        }))
-    );
+    if (!isOpen || !tourId) return null;
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -155,10 +163,8 @@ export default function ManageAssignmentsModal({
                 style={{ maxWidth: '800px' }}
             >
                 <div className="modal-header">
-                    <h2>Manage Seller Assignments</h2>
-                    <button className="modal-close" onClick={onClose}>
-                        ×
-                    </button>
+                    <h2>Manage Assignments - {tourName}</h2>
+
                 </div>
 
                 <div className="modal-body">
@@ -169,6 +175,7 @@ export default function ManageAssignmentsModal({
                                 <label htmlFor="seller">Seller</label>
                                 <select
                                     id="seller"
+                                    className="form-select"
                                     value={selectedSellerId}
                                     onChange={(e) => setSelectedSellerId(e.target.value)}
                                     required
@@ -187,15 +194,16 @@ export default function ManageAssignmentsModal({
                                 <label htmlFor="show">Show</label>
                                 <select
                                     id="show"
+                                    className="form-select"
                                     value={selectedShowId}
                                     onChange={(e) => setSelectedShowId(e.target.value)}
                                     required
-                                    disabled={loading || allShows.length === 0}
+                                    disabled={loading || shows.length === 0}
                                 >
                                     <option value="">Select show...</option>
-                                    {allShows.map((show) => (
+                                    {shows.map((show) => (
                                         <option key={show.id} value={show.id}>
-                                            {show.tourName} - {show.name}
+                                            {show.name} - {new Date(show.date).toLocaleDateString()}
                                         </option>
                                     ))}
                                 </select>

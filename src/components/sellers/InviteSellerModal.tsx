@@ -66,9 +66,7 @@ export default function InviteSellerModal({
             <div className="modal" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>Invite Seller</h2>
-                    <button className="modal-close" onClick={handleClose}>
-                        ×
-                    </button>
+
                 </div>
 
                 <div className="modal-body">
@@ -79,6 +77,7 @@ export default function InviteSellerModal({
                                 <input
                                     type="email"
                                     id="email"
+                                    className="form-input"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="seller@example.com"
@@ -128,6 +127,7 @@ export default function InviteSellerModal({
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <input
                                         type="text"
+                                        className="form-input"
                                         value={invitationLink}
                                         readOnly
                                         style={{ flex: 1 }}

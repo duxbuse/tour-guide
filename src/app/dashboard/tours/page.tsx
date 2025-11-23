@@ -51,6 +51,7 @@ export default function ToursPage() {
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [showInviteSellerModal, setShowInviteSellerModal] = useState(false);
     const [showManageAssignmentsModal, setShowManageAssignmentsModal] = useState(false);
+    const [selectedTourForAssignments, setSelectedTourForAssignments] = useState<{ id: string, name: string } | null>(null);
 
     // Refs for dropdown triggers
     const tourMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
@@ -368,23 +369,9 @@ export default function ToursPage() {
                     <p>Manage your tours and show dates</p>
                 </div>
                 {isManager && (
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => setShowInviteSellerModal(true)}
-                        >
-                            👥 Invite Seller
-                        </button>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => setShowManageAssignmentsModal(true)}
-                        >
-                            📋 Manage Assignments
-                        </button>
-                        <button className="btn btn-primary" onClick={() => setShowNewTourModal(true)}>
-                            + New Tour
-                        </button>
-                    </div>
+                    <button className="btn btn-primary" onClick={() => setShowNewTourModal(true)}>
+                        + New Tour
+                    </button>
                 )}
             </header>
 
@@ -515,6 +502,57 @@ export default function ToursPage() {
                                                     }}
                                                 >
                                                     + Add Show
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowInviteSellerModal(true);
+                                                        setOpenOptionsMenu(null);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem 1rem',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--text-primary)',
+                                                        cursor: 'pointer',
+                                                        textAlign: 'left',
+                                                        fontSize: '0.875rem',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    👥 Invite Seller
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedTourForAssignments({ id: tour.id, name: tour.name });
+                                                        setShowManageAssignmentsModal(true);
+                                                        setOpenOptionsMenu(null);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem 1rem',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--text-primary)',
+                                                        cursor: 'pointer',
+                                                        textAlign: 'left',
+                                                        fontSize: '0.875rem',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    📋 Manage Assignments
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteTour(tour.id)}
@@ -950,8 +988,12 @@ export default function ToursPage() {
 
             <ManageAssignmentsModal
                 isOpen={showManageAssignmentsModal}
-                onClose={() => setShowManageAssignmentsModal(false)}
-                tours={tours}
+                onClose={() => {
+                    setShowManageAssignmentsModal(false);
+                    setSelectedTourForAssignments(null);
+                }}
+                tourId={selectedTourForAssignments?.id || null}
+                tourName={selectedTourForAssignments?.name || null}
             />
         </div>
     );
