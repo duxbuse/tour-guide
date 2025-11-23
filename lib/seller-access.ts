@@ -36,7 +36,7 @@ export async function getSellerAssignedShows(userId: string) {
         },
     });
 
-    return assignments.map((a) => a.show);
+    return assignments.map((a: any) => a.show);
 }
 
 /**
@@ -59,7 +59,7 @@ export async function getShowAssignments(showId: string) {
         },
     });
 
-    return assignments.map((a) => a.seller);
+    return assignments.map((a: any) => a.seller);
 }
 
 /**
@@ -89,5 +89,5 @@ export async function getSellerAssignedShowIds(
         },
     });
 
-    return assignments.map((a) => a.showId);
+    return assignments.map((a: any) => a.showId);
 }

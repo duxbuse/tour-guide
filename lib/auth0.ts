@@ -1,46 +1,100 @@
-// Mock Auth0 client for development
-// In production, replace with: import { Auth0Client } from '@auth0/nextjs-auth0/server';
+import { Auth0Client } from '@auth0/nextjs-auth0/server';
+import { cookies } from 'next/headers';
 
-// Simple user storage for demo switching with localStorage persistence
-const getUserTypeFromStorage = (): 'manager' | 'seller' => {
+export const auth0Client = new Auth0Client({
+    routes: {
+        login: '/api/auth/login',
+        logout: '/api/auth/logout',
+        callback: '/api/auth/callback'
+    },
+    session: {
+        cookie: {
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        }
+    },
+    transactionCookie: {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    }
+});
+
+
+
+// Mock users for demo mode
+const DEMO_USERS = {
+    manager: {
+        sub: 'auth0|691f989d2bc713054fec2340',
+        email: 'manager@test.com',
+        name: 'Tour Manager',
+        picture: 'https://github.com/shadcn.png',
+        'https://tour-guide.app/roles': ['Manager']
+    },
+    seller: {
+        sub: 'auth0|seller-user-id',
+        email: 'seller@test.com',
+        name: 'Tour Seller',
+        picture: 'https://github.com/shadcn.png',
+        'https://tour-guide.app/roles': ['Seller']
+    }
+};
+
+export const auth0 = {
+    getSession: async () => {
+        // Check for demo mode cookie
+        const cookieStore = await cookies();
+        const isDemoMode = cookieStore.get('demo_mode')?.value === 'true';
+
+        if (isDemoMode) {
+            const userType = (cookieStore.get('demo_user_type')?.value as 'manager' | 'seller') || 'manager';
+            return {
+                user: DEMO_USERS[userType]
+            };
+        }
+
+        // Real Auth0 session
+        try {
+            return await auth0Client.getSession();
+        } catch (error) {
+            // If getSession fails (e.g. not logged in), return null
+            return null;
+        }
+    }
+};
+
+// Client-side helpers for demo mode switching
+export const setDemoMode = (enabled: boolean) => {
     if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('tour-guide-user-type');
-        return stored === 'seller' ? 'seller' : 'manager';
+        if (enabled) {
+            document.cookie = "demo_mode=true; path=/; max-age=86400"; // 1 day
+            // Default to manager if not set
+            if (!document.cookie.includes('demo_user_type')) {
+                document.cookie = "demo_user_type=manager; path=/; max-age=86400";
+            }
+        } else {
+            document.cookie = "demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+            document.cookie = "demo_user_type=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        }
+    }
+};
+
+export const setDemoUserType = (userType: 'manager' | 'seller') => {
+    if (typeof window !== 'undefined') {
+        document.cookie = `demo_user_type=${userType}; path=/; max-age=86400`;
+    }
+};
+
+export const getDemoUserType = (): 'manager' | 'seller' => {
+    if (typeof window !== 'undefined') {
+        const match = document.cookie.match(new RegExp('(^| )demo_user_type=([^;]+)'));
+        if (match) return match[2] as 'manager' | 'seller';
     }
     return 'manager';
 };
 
-export const setUserType = (userType: 'manager' | 'seller') => {
+export const isDemoMode = (): boolean => {
     if (typeof window !== 'undefined') {
-        localStorage.setItem('tour-guide-user-type', userType);
+        return document.cookie.includes('demo_mode=true');
     }
-};
-
-export const getCurrentUserType = () => getUserTypeFromStorage();
-
-export const auth0 = {
-    getSession: async () => {
-        const currentUserType = getUserTypeFromStorage();
-        
-        const users = {
-            manager: {
-                sub: 'auth0|manager-user-id',
-                email: process.env.AUTH0_MANAGER_EMAIL || 'manager@test.com',
-                name: 'Tour Manager',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
-            },
-            seller: {
-                sub: 'auth0|seller-user-id',
-                email: process.env.AUTH0_SELLER_EMAIL || 'seller@test.com',
-                name: 'Tour Seller',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Seller']
-            }
-        };
-
-        return {
-            user: users[currentUserType]
-        };
-    }
+    return false;
 };

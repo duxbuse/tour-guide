@@ -14,16 +14,7 @@ export async function GET(request: NextRequest) {
 
         let auth0User = session?.user;
 
-        // Fallback to manager user for development
-        if (!auth0User) {
-            auth0User = {
-                sub: 'auth0|691f989d2bc713054fec2340',
-                email: 'manager@test.com',
-                name: 'Tour Manager',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
-            };
-        }
+
 
         if (!auth0User) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
