@@ -5,12 +5,21 @@ import { format } from 'date-fns';
 import { auth0 } from '@/lib/auth0';
 import { ToursSkeleton } from '@/components/LoadingSkeleton';
 import DropdownMenu from '@/components/DropdownMenu';
+import InviteSellerModal from '@/components/sellers/InviteSellerModal';
+import ManageAssignmentsModal from '@/components/sellers/ManageAssignmentsModal';
 
 interface Show {
     id: string;
     name: string;
     date: string;
     venue: string | null;
+    sellerAssignments?: Array<{
+        seller: {
+            id: string;
+            email: string;
+            name: string | null;
+        };
+    }>;
 }
 
 interface Tour {
@@ -40,6 +49,8 @@ export default function ToursPage() {
     const [openOptionsMenu, setOpenOptionsMenu] = useState<string | null>(null);
     const [openShowMenu, setOpenShowMenu] = useState<string | null>(null);
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [showInviteSellerModal, setShowInviteSellerModal] = useState(false);
+    const [showManageAssignmentsModal, setShowManageAssignmentsModal] = useState(false);
 
     // Refs for dropdown triggers
     const tourMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
@@ -357,9 +368,23 @@ export default function ToursPage() {
                     <p>Manage your tours and show dates</p>
                 </div>
                 {isManager && (
-                    <button className="btn btn-primary" onClick={() => setShowNewTourModal(true)}>
-                        + New Tour
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => setShowInviteSellerModal(true)}
+                        >
+                            👥 Invite Seller
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => setShowManageAssignmentsModal(true)}
+                        >
+                            📋 Manage Assignments
+                        </button>
+                        <button className="btn btn-primary" onClick={() => setShowNewTourModal(true)}>
+                            + New Tour
+                        </button>
+                    </div>
                 )}
             </header>
 
@@ -527,6 +552,7 @@ export default function ToursPage() {
                                                 <th>City</th>
                                                 <th>Date</th>
                                                 <th>Venue</th>
+                                                {isManager && <th>Sellers</th>}
                                                 {isManager && <th>Actions</th>}
                                             </tr>
                                         </thead>
@@ -536,6 +562,31 @@ export default function ToursPage() {
                                                     <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{show.name}</td>
                                                     <td>{format(new Date(show.date), 'MMM d, yyyy')}</td>
                                                     <td>{show.venue || '-'}</td>
+                                                    {isManager && (
+                                                        <td>
+                                                            {show.sellerAssignments && show.sellerAssignments.length > 0 ? (
+                                                                <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                                                    {show.sellerAssignments.map((assignment) => (
+                                                                        <span
+                                                                            key={assignment.seller.id}
+                                                                            className="badge badge-info"
+                                                                            title={assignment.seller.email}
+                                                                            style={{
+                                                                                fontSize: '0.75rem',
+                                                                                padding: '0.25rem 0.5rem',
+                                                                            }}
+                                                                        >
+                                                                            {assignment.seller.name || assignment.seller.email.split('@')[0]}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                                                                    No sellers
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                     {isManager && (
                                                         <td>
                                                             <div style={{ position: 'relative' }}>
@@ -887,6 +938,21 @@ export default function ToursPage() {
                     </div>
                 </div>
             )}
+
+            {/* Seller Management Modals */}
+            <InviteSellerModal
+                isOpen={showInviteSellerModal}
+                onClose={() => setShowInviteSellerModal(false)}
+                onInvitationCreated={() => {
+                    // Optionally refresh data or show success message
+                }}
+            />
+
+            <ManageAssignmentsModal
+                isOpen={showManageAssignmentsModal}
+                onClose={() => setShowManageAssignmentsModal(false)}
+                tours={tours}
+            />
         </div>
     );
 }

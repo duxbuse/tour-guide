@@ -7,6 +7,8 @@ async function main() {
 
   try {
     // Clear existing data
+    await prisma.sellerAssignment.deleteMany();
+    await prisma.invitation.deleteMany();
     await prisma.inventoryRecord.deleteMany();
     await prisma.merchVariant.deleteMany();
     await prisma.merchItem.deleteMany();
@@ -732,7 +734,7 @@ async function main() {
 
     // Spring tour inventory - Sequential records to show shrinkage between shows
     console.log('📊 Creating Spring tour sequential inventory with shrinkage...');
-    
+
     // Men's M shirts progression across all shows with shrinkage
     await Promise.all([
       // Barcelona: Start 25, sell 4, end 19 (2 lost)
@@ -858,7 +860,7 @@ async function main() {
 
     // Winter tour inventory (NO SALES - future tour, but add lost items from prep/transport)
     console.log('📦 Adding winter tour inventory with lost items (no sales)...');
-    
+
     const winterInventoryData = [
       // Pre-tour inventory shipment losses during transport/setup
       { startCount: 50, endCount: 47, addedCount: 0, soldCount: 0, showId: winterShows[0].id, variantId: winterShirtVariants[0].id }, // S - 3 lost in transit
@@ -872,7 +874,7 @@ async function main() {
 
     // Add more comprehensive lost items across other tours
     console.log('📉 Adding additional lost items across all tours...');
-    
+
     const additionalLostItemsData = [
       // Summer tour additional losses - using different shows/variants to avoid duplicates
       { startCount: 50, endCount: 45, addedCount: 0, soldCount: 3, showId: summerShows[3].id, variantId: summerPosterVariant.id }, // NYC Posters - 2 damaged
@@ -880,14 +882,14 @@ async function main() {
       { startCount: 38, endCount: 30, addedCount: 0, soldCount: 6, showId: summerShows[5].id, variantId: summerPosterVariant.id }, // Toronto Posters - 2 damaged
       { startCount: 18, endCount: 12, addedCount: 0, soldCount: 4, showId: summerShows[2].id, variantId: summerHoodieVariants[2].id }, // Berlin L Hoodie - 2 lost
       { startCount: 15, endCount: 10, addedCount: 0, soldCount: 3, showId: summerShows[3].id, variantId: summerHoodieVariants[3].id }, // NYC XL Hoodie - 2 damaged
-      
+
       // Spring tour additional losses - using different shows/variants
       { startCount: 25, endCount: 18, addedCount: 0, soldCount: 5, showId: springShows[3].id, variantId: springToteVariant.id }, // Vienna Totes - 2 lost
       { startCount: 18, endCount: 12, addedCount: 0, soldCount: 4, showId: springShows[4].id, variantId: springToteVariant.id }, // Budapest Totes - 2 stolen
       { startCount: 15, endCount: 11, addedCount: 0, soldCount: 3, showId: springShows[1].id, variantId: springWomensVariants[0].id }, // Amsterdam XS Womens - 1 lost
       { startCount: 12, endCount: 8, addedCount: 0, soldCount: 3, showId: springShows[4].id, variantId: springWomensVariants[3].id }, // Budapest L Womens - 1 damaged
       { startCount: 20, endCount: 15, addedCount: 0, soldCount: 4, showId: springShows[0].id, variantId: springMensVariants[0].id }, // Barcelona S Mens - 1 lost
-      
+
       // Fall tour additional losses - using different shows/variants (avoiding duplicates)
       { startCount: 15, endCount: 10, addedCount: 0, soldCount: 3, showId: fallShows[3].id, variantId: fallMensVariants[0].id }, // Osaka S Mens - 2 lost
       { startCount: 20, endCount: 15, addedCount: 0, soldCount: 3, showId: fallShows[4].id, variantId: fallWomensVariants[0].id }, // Seoul XS Womens - 2 stolen
@@ -897,7 +899,31 @@ async function main() {
     await Promise.all(additionalLostItemsData.map(record => prisma.inventoryRecord.create({ data: record })));
 
     console.log('✅ Database seeding completed successfully!');
-    
+
+    // Create seller assignments - assign test seller to all shows
+    console.log('👥 Creating seller assignments...');
+
+    const seller = await prisma.user.findUnique({
+      where: { email: 'seller@test.com' }
+    });
+
+    if (seller) {
+      const allShows = [...summerShows, ...springShows, ...fallShows, ...winterShows];
+
+      await Promise.all(
+        allShows.map(show =>
+          prisma.sellerAssignment.create({
+            data: {
+              sellerId: seller.id,
+              showId: show.id,
+            },
+          })
+        )
+      );
+
+      console.log(`✅ Assigned seller to all ${allShows.length} shows`);
+    }
+
     // Enhanced summary
     console.log('\n📋 Comprehensive test data summary:');
     console.log(`👤 Users: 2 (Manager & Seller with proper Auth0 IDs)`);
@@ -911,7 +937,7 @@ async function main() {
     console.log(`📐 Variants: 35+ variants (includes male/female options)`);
     console.log(`📊 Inventory Records: 45+ with sales AND comprehensive shrinkage/loss data`);
     console.log(`💰 Price ranges: $15-45 across different item types`);
-    
+
     console.log('\n🧪 Enhanced test scenarios:');
     console.log(`• Smart defaults: T-shirt progression with shrinkage losses`);
     console.log(`• Gender variants: Male/female shirts in Spring & Fall tours`);
