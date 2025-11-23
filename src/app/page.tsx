@@ -26,6 +26,13 @@ export default function Home() {
           >
             View Demo
           </Link>
+          <Link
+            href="/pricing"
+            className="btn btn-secondary"
+            style={{ marginLeft: '0.5rem' }}
+          >
+            Pricing
+          </Link>
         </div>
 
         <div className="features-grid">
