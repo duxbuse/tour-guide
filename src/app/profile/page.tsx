@@ -30,7 +30,7 @@ export default async function ProfilePage() {
             <h1>Profile</h1>
             <div style={{ marginBottom: '2rem' }}>
                 <Image
-                    src={session.user.picture}
+                    src={session.user.picture ?? '/logo.svg'}
                     alt={session.user.name || 'User'}
                     width={80}
                     height={80}
