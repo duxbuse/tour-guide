@@ -1,37 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
+import { getAuthenticatedUser, isManager, isSeller } from '@/lib/rbac';
 
 export async function GET(request: NextRequest) {
     try {
-        const session = await auth0.getSession();
-        let auth0User = session?.user;
+        const user = await getAuthenticatedUser();
 
-        // Fallback to manager user for development
-        if (!auth0User) {
-            auth0User = {
-                sub: 'auth0|691f989d2bc713054fec2340',
-                email: 'manager@test.com',
-                name: 'Tour Manager',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager'],
-            };
-        }
-
-        if (!auth0User) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await findOrCreateUser(auth0User);
-
         // Check user role
-        const userRoles = (
-            (auth0User['https://tour-guide.app/roles'] as string[]) || []
-        ).map((r) => r.toLowerCase());
-        const isManager = userRoles.includes('manager');
-        const isSeller = userRoles.includes('seller');
+        const userIsManager = isManager(user);
+        const userIsSeller = isSeller(user);
 
-        if (!isManager && !isSeller) {
+        if (!userIsManager && !userIsSeller) {
             return NextResponse.json(
                 { error: 'Access denied. Manager or Seller role required.' },
                 { status: 403 }
@@ -40,7 +24,7 @@ export async function GET(request: NextRequest) {
 
         let assignments;
 
-        if (isManager) {
+        if (userIsManager) {
             // Managers can see all assignments for their tours
             assignments = await db.sellerAssignment.findMany({
                 where: {
@@ -118,33 +102,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await auth0.getSession();
-        let auth0User = session?.user;
+        const user = await getAuthenticatedUser();
 
-        // Fallback to manager user for development
-        if (!auth0User) {
-            auth0User = {
-                sub: 'auth0|691f989d2bc713054fec2340',
-                email: 'manager@test.com',
-                name: 'Tour Manager',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager'],
-            };
-        }
-
-        if (!auth0User) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await findOrCreateUser(auth0User);
-
         // Check if user is a manager
-        const userRoles = (
-            (auth0User['https://tour-guide.app/roles'] as string[]) || []
-        ).map((r) => r.toLowerCase());
-        const isManager = userRoles.includes('manager');
-
-        if (!isManager) {
+        if (!isManager(user)) {
             return NextResponse.json(
                 { error: 'Access denied. Manager role required.' },
                 { status: 403 }
@@ -254,33 +219,14 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
     try {
-        const session = await auth0.getSession();
-        let auth0User = session?.user;
+        const user = await getAuthenticatedUser();
 
-        // Fallback to manager user for development
-        if (!auth0User) {
-            auth0User = {
-                sub: 'auth0|691f989d2bc713054fec2340',
-                email: 'manager@test.com',
-                name: 'Tour Manager',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager'],
-            };
-        }
-
-        if (!auth0User) {
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await findOrCreateUser(auth0User);
-
         // Check if user is a manager
-        const userRoles = (
-            (auth0User['https://tour-guide.app/roles'] as string[]) || []
-        ).map((r) => r.toLowerCase());
-        const isManager = userRoles.includes('manager');
-
-        if (!isManager) {
+        if (!isManager(user)) {
             return NextResponse.json(
                 { error: 'Access denied. Manager role required.' },
                 { status: 403 }

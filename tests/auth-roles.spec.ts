@@ -38,7 +38,7 @@ test.describe('Manager User Authentication', () => {
         await expect(page).toHaveURL(/localhost:3000/);
 
         // Check that user is logged in by looking for logout button or user info
-        await expect(page.locator('text=Logout')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Logout').first()).toBeVisible({ timeout: 5000 });
     });
 
     test('Manager can access dashboard', async ({ page }) => {
@@ -97,6 +97,47 @@ test.describe('Manager User Authentication', () => {
         await expect(page.locator(`text=${managerEmail}`)).toBeVisible();
     });
 
+    test('Manager has correct role in session', async ({ page }) => {
+        const managerEmail = process.env.AUTH0_MANAGER_EMAIL;
+        const managerPassword = process.env.AUTH0_MANAGER_PASSWORD;
+
+        if (!managerEmail || !managerPassword) {
+            test.skip();
+            return;
+        }
+
+        await login(page, managerEmail, managerPassword);
+
+        // Call sync endpoint to get role
+        const response = await page.request.get(`${BASE_URL}/api/auth/sync`);
+        expect(response.ok()).toBeTruthy();
+
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.user).toBeDefined();
+        expect(data.user.role).toBe('MANAGER');
+        expect(data.user.email).toBe(managerEmail);
+    });
+
+    test('Manager can access Reports page', async ({ page }) => {
+        const managerEmail = process.env.AUTH0_MANAGER_EMAIL;
+        const managerPassword = process.env.AUTH0_MANAGER_PASSWORD;
+
+        if (!managerEmail || !managerPassword) {
+            test.skip();
+            return;
+        }
+
+        await login(page, managerEmail, managerPassword);
+
+        // Navigate to reports
+        await page.goto(`${BASE_URL}/dashboard/reports`);
+
+        // Should see reports page (not access denied)
+        await expect(page.locator('h1:has-text("Reports")')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Access Denied')).not.toBeVisible();
+    });
+
     test('Manager can log out', async ({ page }) => {
         const managerEmail = process.env.AUTH0_MANAGER_EMAIL;
         const managerPassword = process.env.AUTH0_MANAGER_PASSWORD;
@@ -137,7 +178,7 @@ test.describe('Seller User Authentication', () => {
         await expect(page).toHaveURL(/localhost:3000/);
 
         // Check that user is logged in
-        await expect(page.locator('text=Logout')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Logout').first()).toBeVisible({ timeout: 5000 });
     });
 
     test('Seller can access dashboard', async ({ page }) => {
@@ -177,6 +218,25 @@ test.describe('Seller User Authentication', () => {
         await expect(page.locator(`text=${sellerEmail}`)).toBeVisible();
     });
 
+    test('Seller CANNOT access Reports page', async ({ page }) => {
+        const sellerEmail = process.env.AUTH0_SELLER_EMAIL;
+        const sellerPassword = process.env.AUTH0_SELLER_PASSWORD;
+
+        if (!sellerEmail || !sellerPassword) {
+            test.skip();
+            return;
+        }
+
+        await login(page, sellerEmail, sellerPassword);
+
+        // Navigate to reports
+        await page.goto(`${BASE_URL}/dashboard/reports`);
+
+        // Should see access denied message
+        await expect(page.locator('text=Access Denied')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Required role: Manager')).toBeVisible();
+    });
+
     test('Seller has correct role in session', async ({ page }) => {
         const sellerEmail = process.env.AUTH0_SELLER_EMAIL;
         const sellerPassword = process.env.AUTH0_SELLER_PASSWORD;
@@ -188,15 +248,15 @@ test.describe('Seller User Authentication', () => {
 
         await login(page, sellerEmail, sellerPassword);
 
-        // Navigate to profile to see session data
-        await page.goto(`${BASE_URL}/profile`);
+        // Call sync endpoint to get role
+        const response = await page.request.get(`${BASE_URL}/api/auth/sync`);
+        expect(response.ok()).toBeTruthy();
 
-        // Check that the role is displayed (if your profile page shows it)
-        // This will depend on how you display the session data
-        const pageContent = await page.content();
-
-        // The session should contain role information
-        expect(pageContent).toBeTruthy();
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.user).toBeDefined();
+        expect(data.user.role).toBe('SELLER');
+        expect(data.user.email).toBe(sellerEmail);
     });
 });
 

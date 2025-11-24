@@ -27,18 +27,24 @@ export async function GET(request: NextRequest) {
             where: { auth0Id }
         });
 
-        // If user doesn't exist, create them with Manager role
+        // If user doesn't exist, create them
         if (!user) {
-            console.log('Creating new user with Manager role:', email);
+            // Check if this is the first user (should be manager)
+            const userCount = await db.user.count();
+            const isFirstUser = userCount === 0;
+
+            const defaultRole = isFirstUser ? 'MANAGER' : 'SELLER';
+
+            console.log(`Creating new user with ${defaultRole} role:`, email);
             user = await db.user.create({
                 data: {
                     auth0Id,
                     email,
                     name: name || email.split('@')[0],
-                    role: 'MANAGER', // Default role for new users
+                    role: defaultRole,
                 }
             });
-            console.log('User created:', user.id);
+            console.log('User created:', user.id, 'with role:', user.role);
         }
 
         return NextResponse.json({
