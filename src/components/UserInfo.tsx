@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { auth0 } from '@/lib/auth0';
 import UserSwitcher from './UserSwitcher';
+import { isDemoMode, getDemoUserType } from '@/lib/demo-mode';
 
 interface User {
     name?: string;
@@ -11,55 +11,43 @@ interface User {
     picture?: string;
 }
 
-export default function UserInfo() {
-    const [user, setUser] = useState<User | null>(null);
+interface UserInfoProps {
+    user?: User | null;
+}
+
+export default function UserInfo({ user }: UserInfoProps) {
+    const [isDemo, setIsDemo] = useState(false);
+    const [demoType, setDemoType] = useState<'manager' | 'seller'>('manager');
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        const getUser = async () => {
-            try {
-                const session = await auth0.getSession();
-                setUser(session?.user || null);
-            } catch (error) {
-                console.error('Error getting session:', error);
-                setUser(null);
-            } finally {
-                setMounted(true);
-            }
-        };
-
-        getUser();
+        setIsDemo(isDemoMode());
+        setDemoType(getDemoUserType());
+        setMounted(true);
     }, []);
 
-    // Show loading placeholder during SSR and initial hydration
-    if (!mounted) {
-        return (
-            <div className="navbar-user">
-                <div className="user-info">
-                    <div className="loading-skeleton skeleton-text" style={{ width: '120px', height: '1rem' }}></div>
-                    <div className="loading-skeleton skeleton-text" style={{ width: '140px', height: '0.875rem', marginTop: '0.25rem' }}></div>
-                </div>
-                <div className="loading-skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }}></div>
-                <div className="loading-skeleton skeleton-text" style={{ width: '100px', height: '0.875rem' }}></div>
-                <div className="loading-skeleton skeleton-text" style={{ width: '60px', height: '0.875rem' }}></div>
-            </div>
-        );
-    }
+    if (!mounted) return null;
 
-    if (!user) {
+    // If not logged in and not in demo mode, show login button
+    if (!user && !isDemo) {
         // eslint-disable-next-line @next/next/no-html-link-for-pages
         return <a href="/api/auth/login" className="btn btn-primary">Log In</a>;
     }
 
+    // Determine display values
+    const displayName = isDemo ? (demoType === 'manager' ? 'Tour Manager' : 'Merch Seller') : user?.name;
+    const displayEmail = isDemo ? (demoType === 'manager' ? 'manager@test.com' : 'seller@test.com') : user?.email;
+    const displayPicture = isDemo ? null : user?.picture;
+
     return (
         <div className="navbar-user">
             <div className="user-info">
-                <span className="user-name">{user.name}</span>
-                <span className="user-email">{user.email}</span>
+                <span className="user-name">{displayName}</span>
+                <span className="user-email">{displayEmail}</span>
             </div>
             <Image
-                src={user.picture || '/logo-v2.svg'}
-                alt={user.name || 'User'}
+                src={displayPicture || '/logo-v2.svg'}
+                alt={displayName || 'User'}
                 width={32}
                 height={32}
                 className="user-avatar"

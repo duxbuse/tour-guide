@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { auth0 } from '@/lib/auth0';
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUserRole } from '@/hooks/useUserRole';
 import { ToursSkeleton } from '@/components/LoadingSkeleton';
 import DropdownMenu from '@/components/DropdownMenu';
 import InviteSellerModal from '@/components/sellers/InviteSellerModal';
@@ -36,6 +37,8 @@ interface Tour {
 }
 
 export default function ToursPage() {
+    const { user, isLoading: userLoading } = useUser();
+    const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [loading, setLoading] = useState(true);
     const [showNewTourModal, setShowNewTourModal] = useState(false);
@@ -48,7 +51,7 @@ export default function ToursPage() {
     const [editingTourName, setEditingTourName] = useState('');
     const [openOptionsMenu, setOpenOptionsMenu] = useState<string | null>(null);
     const [openShowMenu, setOpenShowMenu] = useState<string | null>(null);
-    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    // const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [showInviteSellerModal, setShowInviteSellerModal] = useState(false);
     const [showManageAssignmentsModal, setShowManageAssignmentsModal] = useState(false);
     const [selectedTourForAssignments, setSelectedTourForAssignments] = useState<{ id: string, name: string } | null>(null);
@@ -57,27 +60,19 @@ export default function ToursPage() {
     const tourMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
     const showMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
-    useEffect(() => {
-        // Get current user from auth service
-        const fetchUser = async () => {
-            const session = await auth0.getSession();
-            if (session?.user) {
-                setUser(session.user);
-            }
-        };
-        fetchUser();
-    }, []);
+    // useEffect(() => {
+    //     // Get current user from auth service
+    //     const fetchUser = async () => {
+    //         const session = await auth0.getSession();
+    //         if (session?.user) {
+    //             setUser(session.user);
+    //         }
+    //     };
+    //     fetchUser();
+    // }, []);
 
     // Check user role - Only managers can edit/delete shows
-    const getUserRoles = (): string[] => {
-        if (!user) return [];
-        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
-        const standardRoles = (user.roles as string[]) || [];
-        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
-    };
-
-    const userRoles = getUserRoles();
-    const isManager = userRoles.includes('manager');
+    const isManager = role?.toLowerCase() === 'manager';
 
     const [newTour, setNewTour] = useState({
         name: '',
@@ -357,7 +352,7 @@ export default function ToursPage() {
         }
     };
 
-    if (loading) {
+    if (loading || roleLoading) {
         return <ToursSkeleton />;
     }
 

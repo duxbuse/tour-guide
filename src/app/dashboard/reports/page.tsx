@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { auth0 } from '@/lib/auth0';
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Show {
     id: string;
@@ -48,23 +49,17 @@ interface VariantSales {
 
 
 export default function ReportsPage() {
+    const { user, isLoading: userLoading } = useUser();
+    const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
-    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    // const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const [showsLoading, setShowsLoading] = useState(false);
 
     useEffect(() => {
-        // Get current user from auth service
-        const fetchUser = async () => {
-            const session = await auth0.getSession();
-            if (session?.user) {
-                setUser(session.user);
-            }
-        };
-        fetchUser();
         fetchTours();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -77,15 +72,7 @@ export default function ReportsPage() {
     }, [selectedTourId]);
 
     // Check user role - Only managers can access reports
-    const getUserRoles = (): string[] => {
-        if (!user) return [];
-        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
-        const standardRoles = (user.roles as string[]) || [];
-        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
-    };
-
-    const userRoles = getUserRoles();
-    const isManager = userRoles.includes('manager');
+    const isManager = role?.toLowerCase() === 'manager';
 
     const fetchTours = async () => {
         try {
@@ -343,7 +330,7 @@ export default function ReportsPage() {
         });
     };
 
-    if (loading) {
+    if (loading || roleLoading) {
         return (
             <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
                 <p>Loading reports...</p>

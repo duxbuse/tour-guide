@@ -9,6 +9,7 @@ export const GET = async (req: any) => {
         }
         return await client.handler(req);
     } catch (e: any) {
-        return new NextResponse("Error: " + (e?.message || String(e)), { status: 500 });
+        console.error("Auth0 Callback Error:", e);
+        return NextResponse.json({ error: e?.message || String(e), stack: e?.stack }, { status: 500 });
     }
 };

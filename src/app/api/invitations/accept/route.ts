@@ -88,6 +88,36 @@ export async function POST(request: NextRequest) {
             },
         });
 
+        // Assign role in Auth0
+        try {
+            const { managementClient } = await import('@/lib/auth0-management');
+
+            // Get all roles to find the one matching the invitation role
+            // Note: Auth0 roles are case-sensitive, usually Capitalized (Manager, Seller)
+            // Our DB roles are UPPERCASE (MANAGER, SELLER)
+            // We'll try to match case-insensitive
+            const rolesResponse = await managementClient.roles.list();
+            const roles = rolesResponse.data;
+            const targetRoleName = invitation.role === 'SELLER' ? 'Seller' : 'Manager';
+            const targetRole = roles.find(
+                (r) => r.name?.toLowerCase() === targetRoleName.toLowerCase()
+            );
+
+            if (targetRole && targetRole.id) {
+                await managementClient.users.roles.assign(
+                    auth0User.sub!,
+                    { roles: [targetRole.id] }
+                );
+                console.log(`Assigned Auth0 role ${targetRole.name} to user ${auth0User.sub}`);
+            } else {
+                console.warn(`Could not find Auth0 role matching ${invitation.role}`);
+            }
+        } catch (error) {
+            console.error('Error assigning Auth0 role:', error);
+            // Don't fail the request if Auth0 role assignment fails, 
+            // as the local user is already updated.
+        }
+
         // Mark invitation as accepted
         await db.invitation.update({
             where: { id: invitation.id },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { setDemoUserType, getDemoUserType, isDemoMode } from '@/lib/auth0';
+import { setDemoUserType, getDemoUserType, isDemoMode } from '@/lib/demo-mode';
 
 export default function UserSwitcher() {
     const [isLoading, setIsLoading] = useState(false);

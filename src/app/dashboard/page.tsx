@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { auth0 } from "@/lib/auth0";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUserRole } from '@/hooks/useUserRole';
+import { isDemoMode, getDemoUserType } from '@/lib/demo-mode';
 import { DashboardSkeleton } from '@/components/LoadingSkeleton';
 
 interface Show {
@@ -43,20 +45,20 @@ interface InventoryRecord {
 }
 
 export default function DashboardPage() {
+    const { user, isLoading: userLoading } = useUser();
+    const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [allInventoryRecords, setAllInventoryRecords] = useState<InventoryRecord[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [dataLoading, setDataLoading] = useState(true);
+    const [isDemo, setIsDemo] = useState(false);
+    const [demoType, setDemoType] = useState<'manager' | 'seller'>('manager');
 
     useEffect(() => {
+        setIsDemo(isDemoMode());
+        setDemoType(getDemoUserType());
+
         const fetchData = async () => {
             try {
-                // Get current user
-                const session = await auth0.getSession();
-                if (session?.user) {
-                    setUser(session.user);
-                }
-
                 // Fetch all dashboard data in one optimized request
                 const dashboardResponse = await fetch('/api/dashboard');
                 if (dashboardResponse.ok) {
@@ -67,12 +69,16 @@ export default function DashboardPage() {
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
             } finally {
-                setLoading(false);
+                setDataLoading(false);
             }
         };
 
-        fetchData();
-    }, []);
+        if (user && role) {
+            fetchData();
+        } else if (!userLoading && !roleLoading) {
+            setDataLoading(false);
+        }
+    }, [user, userLoading, role, roleLoading]);
 
     // Calculate shrinkage across all tours
     const calculateTotalShrinkage = () => {
@@ -124,17 +130,17 @@ export default function DashboardPage() {
         const totalSold = allInventoryRecords.reduce((sum, record) =>
             sum + (record.soldCount || 0), 0
         );
-        
+
         const totalRevenue = allInventoryRecords.reduce((sum, record) =>
             sum + ((record.soldCount || 0) * record.variant.price), 0
         );
 
-        const lowStockItems = allInventoryRecords.filter(record => 
+        const lowStockItems = allInventoryRecords.filter(record =>
             record.variant.quantity < 5
         ).length;
 
         const upcomingShows = tours.reduce((total, tour) => {
-            return total + tour.shows.filter(show => 
+            return total + tour.shows.filter(show =>
                 new Date(show.date) > new Date()
             ).length;
         }, 0);
@@ -152,17 +158,9 @@ export default function DashboardPage() {
     };
 
     // Check user role - Managers and Sellers can access dashboard
-    const getUserRoles = (): string[] => {
-        if (!user) return [];
-        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
-        const standardRoles = (user.roles as string[]) || [];
-        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
-    };
+    const hasAccess = role && (role.toLowerCase() === 'manager' || role.toLowerCase() === 'seller');
 
-    const userRoles = getUserRoles();
-    const hasAccess = userRoles.includes('manager') || userRoles.includes('seller');
-
-    if (loading) {
+    if (userLoading || roleLoading || dataLoading) {
         return <DashboardSkeleton />;
     }
 
@@ -192,104 +190,104 @@ export default function DashboardPage() {
     const stats = calculateTotals();
 
     return (
-            <div className="animate-fade-in">
-                <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h1>Dashboard</h1>
-                        <p>Welcome back, {user?.name || 'Tour Manager'}. Overview across all tours.</p>
-                    </div>
-                </header>
+        <div className="animate-fade-in">
+            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1>Dashboard</h1>
+                    <p>Welcome back, {isDemo ? (demoType === 'manager' ? 'Tour Manager' : 'Merch Seller') : (user?.name || 'Tour Manager')}. Overview across all tours.</p>
+                </div>
+            </header>
 
-                <div className="stat-grid">
-                    <div className="stat-card">
-                        <div className="stat-label">Total Revenue (All Tours)</div>
-                        <div className="stat-value">${stats.totalRevenue.toFixed(2)}</div>
-                        <div style={{ color: stats.totalRevenue > 0 ? '#10B981' : 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            {stats.totalRevenue > 0 ? 'From inventory sales' : 'Ready to start'}
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Items Sold (All Tours)</div>
-                        <div className="stat-value">{stats.totalSold}</div>
-                        <div style={{ color: stats.totalSold > 0 ? '#10B981' : 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            {stats.totalSold > 0 ? 'Total across all shows' : 'Ready to start'}
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Low Stock Items</div>
-                        <div className="stat-value" style={{ color: stats.lowStockItems > 0 ? '#EF4444' : 'var(--text-secondary)' }}>
-                            {stats.lowStockItems}
-                        </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            {stats.lowStockItems === 0 ? 'All good' : 'Need restocking'}
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Upcoming Shows</div>
-                        <div className="stat-value">{stats.upcomingShows}</div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            {stats.upcomingShows === 0 ? 'Plan your tour' : 'Across all tours'}
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Shrinkage Loss (All Tours)</div>
-                        <div className="stat-value" style={{ color: stats.totalShrinkage > 0 ? '#ef4444' : 'var(--text-secondary)' }}>
-                            {stats.totalShrinkage}
-                        </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            {stats.totalShrinkage > 0 ? `Lost/damaged items ($${stats.totalShrinkageValue.toFixed(2)})` : 'No losses recorded'}
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Active Tours</div>
-                        <div className="stat-value">{tours.filter(t => t.isActive).length}</div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            Total tours: {tours.length}
-                        </div>
+            <div className="stat-grid">
+                <div className="stat-card">
+                    <div className="stat-label">Total Revenue (All Tours)</div>
+                    <div className="stat-value">${stats.totalRevenue.toFixed(2)}</div>
+                    <div style={{ color: stats.totalRevenue > 0 ? '#10B981' : 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {stats.totalRevenue > 0 ? 'From inventory sales' : 'Ready to start'}
                     </div>
                 </div>
+                <div className="stat-card">
+                    <div className="stat-label">Items Sold (All Tours)</div>
+                    <div className="stat-value">{stats.totalSold}</div>
+                    <div style={{ color: stats.totalSold > 0 ? '#10B981' : 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {stats.totalSold > 0 ? 'Total across all shows' : 'Ready to start'}
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-label">Low Stock Items</div>
+                    <div className="stat-value" style={{ color: stats.lowStockItems > 0 ? '#EF4444' : 'var(--text-secondary)' }}>
+                        {stats.lowStockItems}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {stats.lowStockItems === 0 ? 'All good' : 'Need restocking'}
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-label">Upcoming Shows</div>
+                    <div className="stat-value">{stats.upcomingShows}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {stats.upcomingShows === 0 ? 'Plan your tour' : 'Across all tours'}
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-label">Shrinkage Loss (All Tours)</div>
+                    <div className="stat-value" style={{ color: stats.totalShrinkage > 0 ? '#ef4444' : 'var(--text-secondary)' }}>
+                        {stats.totalShrinkage}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {stats.totalShrinkage > 0 ? `Lost/damaged items ($${stats.totalShrinkageValue.toFixed(2)})` : 'No losses recorded'}
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-label">Active Tours</div>
+                    <div className="stat-value">{tours.filter(t => t.isActive).length}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        Total tours: {tours.length}
+                    </div>
+                </div>
+            </div>
 
-                <div className="card">
-                    <h3 style={{ marginBottom: '1rem' }}>Recent Activity</h3>
-                    {allInventoryRecords.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {allInventoryRecords
-                                .slice(0, 5)
-                                .map((record, index) => (
-                                    <div key={index} style={{
-                                        padding: '1rem',
-                                        background: 'var(--bg-secondary)',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--border-subtle)'
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div>
-                                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-                                                    {record.variant.merchItem.name} - {record.variant.type ? `${record.variant.type} ` : ''}{record.variant.size}
-                                                </div>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                                    {record.show.name}
-                                                </div>
+            <div className="card">
+                <h3 style={{ marginBottom: '1rem' }}>Recent Activity</h3>
+                {allInventoryRecords.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {allInventoryRecords
+                            .slice(0, 5)
+                            .map((record, index) => (
+                                <div key={index} style={{
+                                    padding: '1rem',
+                                    background: 'var(--bg-secondary)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-subtle)'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                                                {record.variant.merchItem.name} - {record.variant.type ? `${record.variant.type} ` : ''}{record.variant.size}
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <div style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>
-                                                    {record.soldCount || 0} sold
-                                                </div>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                                    ${((record.soldCount || 0) * record.variant.price).toFixed(2)}
-                                                </div>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                                {record.show.name}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>
+                                                {record.soldCount || 0} sold
+                                            </div>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                                ${((record.soldCount || 0) * record.variant.price).toFixed(2)}
                                             </div>
                                         </div>
                                     </div>
-                                ))}
-                        </div>
-                    ) : (
-                        <div className="empty-state">
-                            <h3>No activity yet</h3>
-                            <p>Sales and updates will appear here.</p>
-                        </div>
-                    )}
-                </div>
+                                </div>
+                            ))}
+                    </div>
+                ) : (
+                    <div className="empty-state">
+                        <h3>No activity yet</h3>
+                        <p>Sales and updates will appear here.</p>
+                    </div>
+                )}
             </div>
+        </div>
     );
 }

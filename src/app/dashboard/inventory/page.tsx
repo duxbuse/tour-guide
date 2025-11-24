@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { auth0 } from '@/lib/auth0';
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUserRole } from '@/hooks/useUserRole';
 import { MerchItem, MerchVariant, InventoryRecord, Tour } from '@/types/inventory';
 import InventoryStats from '@/components/inventory/InventoryStats';
 import ExportModal from '@/components/inventory/modals/ExportModal';
@@ -11,6 +12,8 @@ import EditItemModal from '@/components/inventory/modals/EditItemModal';
 import InventoryShowSelectModal from '@/components/inventory/modals/InventoryShowSelectModal';
 
 export default function InventoryPage() {
+    const { user, isLoading: userLoading } = useUser();
+    const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
     const [merchItems, setMerchItems] = useState<MerchItem[]>([]);
@@ -19,35 +22,27 @@ export default function InventoryPage() {
     const [editingItem, setEditingItem] = useState<MerchItem | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [user, setUser] = useState<any>(null);
+    // const [user, setUser] = useState<any>(null);
     const [selectedShowId, setSelectedShowId] = useState<string | null>(null);
     const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
     const [showInventoryModal, setShowInventoryModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
 
-    useEffect(() => {
-        // Get current user from auth service
-        const fetchUser = async () => {
-            const session = await auth0.getSession();
-            if (session?.user) {
-                setUser(session.user);
-            }
-        };
-        fetchUser();
-    }, []);
+    // useEffect(() => {
+    //     // Get current user from auth service
+    //     const fetchUser = async () => {
+    //         const session = await auth0.getSession();
+    //         if (session?.user) {
+    //             setUser(session.user);
+    //         }
+    //     };
+    //     fetchUser();
+    // }, []);
 
     // Check user role - Manager can delete/create, both Manager and Seller can edit quantities
-    const getUserRoles = (): string[] => {
-        if (!user) return [];
-        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
-        const standardRoles = (user.roles as string[]) || [];
-        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
-    };
-
-    const userRoles = getUserRoles();
-    const isManager = userRoles.includes('manager');
+    const isManager = role?.toLowerCase() === 'manager';
     const canManageItems = isManager; // Only managers can create/delete
-    const canEditQuantities = isManager || userRoles.includes('seller'); // Both can edit quantities
+    const canEditQuantities = isManager || role?.toLowerCase() === 'seller'; // Both can edit quantities
 
     useEffect(() => {
         fetchTours();
@@ -223,7 +218,7 @@ export default function InventoryPage() {
         }
     };
 
-    if (loading) {
+    if (loading || roleLoading) {
         return (
             <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
                 <p>Loading inventory...</p>
