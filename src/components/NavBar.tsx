@@ -3,7 +3,7 @@ import ResponsiveNavBar from './ResponsiveNavBar';
 
 export async function NavBar() {
     const session = await auth0.getSession();
-    const user = session?.user;
+    const user = session?.user ?? null;
 
     return <ResponsiveNavBar user={user} />;
 }

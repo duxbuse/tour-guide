@@ -50,6 +50,7 @@ export default defineConfig({
     },
 
     /* Test against mobile viewports. */
+    // Mobile tests disabled - UI elements like logout button are hidden in collapsed menus
     // {
     //   name: 'Mobile Chrome',
     //   use: { ...devices['Pixel 5'] },

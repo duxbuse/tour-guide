@@ -7,11 +7,21 @@ I've created a comprehensive test suite to verify that Manager and Seller users 
 ## 📋 What Was Created
 
 ### 1. Test Files
-- **`tests/auth-roles.spec.ts`** - Main test suite with 15+ tests covering:
+- **`tests/auth-roles.spec.ts`** - Authentication and role verification tests:
   - Manager authentication and access
   - Seller authentication and access
   - Unauthenticated user redirects
   - Role-based access control verification
+  - Database role verification via `/api/auth/sync`
+  - Reports page access control
+
+- **`tests/rbac-sync.spec.ts`** - Comprehensive RBAC implementation tests:
+  - Sync endpoint role assignment
+  - Role persistence across sessions
+  - Role-based UI element visibility
+  - Invitation flow role assignment
+  - API route protection (manager-only endpoints)
+  - Seller access restrictions
 
 ### 2. Configuration
 - **`playwright.config.ts`** - Updated to:
@@ -30,6 +40,7 @@ npm run test:ui       # Interactive UI mode
 npm run test:headed   # See browser while testing
 npm run test:debug    # Debug mode
 npm run test:auth     # Run only auth tests
+npm run test:rbac     # Run only RBAC tests
 ```
 
 ## 🚀 How to Run Tests
@@ -93,6 +104,17 @@ npm run test:headed
 ### Role-Based Access Control ✅
 - [x] Manager and Seller have separate sessions
 - [x] Each user sees their own email/data
+- [x] Manager has MANAGER role in database
+- [x] Seller has SELLER role in database
+- [x] Roles persist across page navigations
+- [x] Manager can access Reports page
+- [x] Seller CANNOT access Reports page
+- [x] Manager sees manager-specific UI (New Tour button)
+- [x] Seller does NOT see manager-specific UI
+- [x] Manager can access `/api/invitations`
+- [x] Seller CANNOT access `/api/invitations` (403)
+- [x] Manager can access `/api/seller-assignments`
+- [x] Seller can access `/api/seller-assignments` (read-only)
 
 ## 🔍 What the Tests Verify
 
@@ -109,6 +131,18 @@ npm run test:headed
 3. **User Isolation**
    - Manager and Seller have separate sessions
    - User data is correctly scoped
+
+4. **Database-Backed RBAC**
+   - Roles stored in database (not Auth0 tokens)
+   - First user gets MANAGER role
+   - Subsequent users get SELLER role
+   - Roles synced via `/api/auth/sync` endpoint
+   - `useUserRole` hook fetches from database
+
+5. **API Route Protection**
+   - Manager-only routes enforce database role check
+   - Proper 401/403 error responses
+   - Seller restrictions on sensitive endpoints
 
 ## 📝 Test Structure
 
@@ -144,9 +178,11 @@ test('Manager can log in successfully', async ({ page }) => {
 You can now:
 1. Run the tests to verify your setup
 2. Add more role-specific tests
-3. Test Manager-only features (create tour, add merch)
-4. Test Seller-only features (update stock)
-5. Add visual regression tests
+3. Test Manager-only features (create tour, add merch, invite sellers)
+4. Test Seller-only features (update stock, view assigned shows)
+5. Test invitation acceptance flow
+6. Add visual regression tests
+7. Test role persistence across browser sessions
 
 ## 📚 Resources
 

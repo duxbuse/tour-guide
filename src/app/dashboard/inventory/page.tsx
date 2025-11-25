@@ -1,109 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { auth0 } from '@/lib/auth0';
-
-interface MerchVariant {
-    id: string;
-    size: string;
-    type: string | null;
-    price: number;
-    quantity: number;
-}
-
-interface MerchItem {
-    id: string;
-    name: string;
-    description: string | null;
-    imageUrl: string | null;
-    variants: MerchVariant[];
-}
-
-interface Show {
-    id: string;
-    name: string;
-    date: string;
-    venue: string | null;
-}
-
-interface Tour {
-    id: string;
-    name: string;
-    shows: Show[];
-}
-
-interface InventoryRecord {
-    id: string;
-    startCount: number;
-    addedCount: number;
-    endCount: number | null;
-    soldCount: number | null;
-    showId: string;
-    variantId: string;
-    show: Show;
-    variant: {
-        id: string;
-        size: string;
-        type: string | null;
-        price: number;
-        quantity: number;
-        merchItem: {
-            id: string;
-            name: string;
-        };
-    };
-}
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUserRole } from '@/hooks/useUserRole';
+import { MerchItem, MerchVariant, InventoryRecord, Tour } from '@/types/inventory';
+import InventoryStats from '@/components/inventory/InventoryStats';
+import ExportModal from '@/components/inventory/modals/ExportModal';
+import NewItemModal from '@/components/inventory/modals/NewItemModal';
+import EditItemModal from '@/components/inventory/modals/EditItemModal';
+import InventoryShowSelectModal from '@/components/inventory/modals/InventoryShowSelectModal';
 
 export default function InventoryPage() {
+    const { user, isLoading: userLoading } = useUser();
+    const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
     const [merchItems, setMerchItems] = useState<MerchItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [showNewItemModal, setShowNewItemModal] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
     const [editingItem, setEditingItem] = useState<MerchItem | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // const [user, setUser] = useState<any>(null);
     const [selectedShowId, setSelectedShowId] = useState<string | null>(null);
     const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
     const [showInventoryModal, setShowInventoryModal] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
 
-    useEffect(() => {
-        // Get current user from auth service
-        const fetchUser = async () => {
-            const session = await auth0.getSession();
-            if (session?.user) {
-                setUser(session.user);
-            }
-        };
-        fetchUser();
-    }, []); // Remove dependency so it only runs once or add currentUserType to dependencies
+    // useEffect(() => {
+    //     // Get current user from auth service
+    //     const fetchUser = async () => {
+    //         const session = await auth0.getSession();
+    //         if (session?.user) {
+    //             setUser(session.user);
+    //         }
+    //     };
+    //     fetchUser();
+    // }, []);
 
     // Check user role - Manager can delete/create, both Manager and Seller can edit quantities
-    const getUserRoles = (): string[] => {
-        if (!user) return [];
-        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
-        const standardRoles = (user.roles as string[]) || [];
-        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
-    };
-
-    const userRoles = getUserRoles();
-    const isManager = userRoles.includes('manager');
+    const isManager = role?.toLowerCase() === 'manager';
     const canManageItems = isManager; // Only managers can create/delete
-    const canEditQuantities = isManager || userRoles.includes('seller'); // Both can edit quantities
-
-    const [newItem, setNewItem] = useState({
-        name: '',
-        description: '',
-        imageUrl: '',
-        price: '',
-    });
-
-    const [variants, setVariants] = useState([
-        { size: 'S', type: '', quantity: '0' },
-    ]);
+    const canEditQuantities = isManager || role?.toLowerCase() === 'seller'; // Both can edit quantities
 
     useEffect(() => {
         fetchTours();
@@ -112,14 +51,49 @@ export default function InventoryPage() {
 
     useEffect(() => {
         if (selectedTourId) {
-            fetchMerchItems(selectedTourId);
-            fetchInventoryRecords(selectedTourId);
+            const loadData = async () => {
+                setLoading(true);
+                await Promise.all([
+                    fetchMerchItems(selectedTourId),
+                    fetchInventoryRecords(selectedTourId)
+                ]);
+                setLoading(false);
+            };
+            loadData();
         }
     }, [selectedTourId]);
 
+    // Memoize the latest count for each variant to avoid O(N*M*R) complexity during render
+    const latestVariantCounts = useMemo(() => {
+        const counts = new Map<string, number>();
+
+        merchItems.forEach(item => {
+            item.variants.forEach(variant => {
+                const variantRecords = inventoryRecords.filter(r => r.variantId === variant.id);
+
+                if (variantRecords.length === 0) {
+                    counts.set(variant.id, variant.quantity);
+                    return;
+                }
+
+                // Sort by show date (most recent first)
+                const sortedRecords = variantRecords.sort((a, b) =>
+                    new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
+                );
+
+                const mostRecentRecord = sortedRecords[0];
+                // Use end count if available, otherwise start count, otherwise base quantity
+                const count = mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? variant.quantity;
+                counts.set(variant.id, count);
+            });
+        });
+
+        return counts;
+    }, [merchItems, inventoryRecords]);
+
     const fetchTours = async () => {
         try {
-            const response = await fetch('/api/tours');
+            const response = await fetch('/api/tours?includeShows=true');
             if (response.ok) {
                 const data = await response.json();
                 setTours(data);
@@ -130,7 +104,8 @@ export default function InventoryPage() {
         } catch (error) {
             console.error('Error fetching tours:', error);
         } finally {
-            setLoading(false);
+            // Initial loading state handled by the Promise.all in the other useEffect
+            if (!selectedTourId) setLoading(false);
         }
     };
 
@@ -155,81 +130,6 @@ export default function InventoryPage() {
             }
         } catch (error) {
             console.error('Error fetching merch items:', error);
-        }
-    };
-
-    const handleImageUpload = async (file: File) => {
-        if (!file) return null;
-
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (response.ok) {
-                const { url } = await response.json();
-                return url;
-            } else {
-                console.error('Failed to upload image');
-                return null;
-            }
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            return null;
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleCreateItem = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedTourId) return;
-
-        setSubmitting(true);
-
-        try {
-            // Handle image upload if a file was selected
-            let imageUrl = newItem.imageUrl;
-            const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-            if (fileInput?.files?.[0]) {
-                const uploadedUrl = await handleImageUpload(fileInput.files[0]);
-                if (uploadedUrl) {
-                    imageUrl = uploadedUrl;
-                }
-            }
-
-            const response = await fetch('/api/merch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tourId: selectedTourId,
-                    name: newItem.name,
-                    description: newItem.description,
-                    imageUrl: imageUrl,
-                    variants: variants.filter(v => v.size).map(v => ({ ...v, price: newItem.price, quantity: v.quantity })),
-                }),
-            });
-
-            if (response.ok) {
-                const item = await response.json();
-                setMerchItems([item, ...merchItems]);
-                setShowNewItemModal(false);
-                setNewItem({ name: '', description: '', imageUrl: '', price: '' });
-                setVariants([{ size: 'S', type: '', quantity: '0' }]);
-                // Reset file input
-                if (fileInput) {
-                    fileInput.value = '';
-                }
-            }
-        } catch (error) {
-            console.error('Error creating merch item:', error);
-        } finally {
-            setSubmitting(false);
         }
     };
 
@@ -318,91 +218,7 @@ export default function InventoryPage() {
         }
     };
 
-    const handleExportInventory = async () => {
-        if (!selectedTourId || merchItems.length === 0) return;
-
-        const selectedTour = tours.find(t => t.id === selectedTourId);
-        if (!selectedTour) return;
-
-        import('xlsx').then(xlsx => {
-            // Create main inventory sheet for sellers
-            const inventoryData = merchItems.flatMap(item =>
-                item.variants.map(variant => {
-                    // Get the most recent inventory count for this variant
-                    const variantRecords = inventoryRecords.filter(r => r.variantId === variant.id);
-                    let currentCount = variant.quantity;
-                    let lastShowDate = 'Initial Stock';
-
-                    if (variantRecords.length > 0) {
-                        const sortedRecords = variantRecords.sort((a, b) =>
-                            new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
-                        );
-                        const mostRecentRecord = sortedRecords[0];
-                        currentCount = mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? variant.quantity;
-                        lastShowDate = new Date(mostRecentRecord.show.date).toLocaleDateString();
-                    }
-
-                    return {
-                        Item: item.name,
-                        Variant: `${variant.type ? variant.type + ' - ' : ''}${variant.size}`,
-                        'Current Count': currentCount,
-                        'Unit Price': `$${variant.price.toFixed(2)}`,
-                        'Total Value': `$${(currentCount * variant.price).toFixed(2)}`,
-                        'Last Updated': lastShowDate,
-                        'Low Stock': currentCount < 5 ? 'YES' : 'NO'
-                    };
-                })
-            );
-
-            const worksheet = xlsx.utils.json_to_sheet(inventoryData);
-            const workbook = xlsx.utils.book_new();
-            xlsx.utils.book_append_sheet(workbook, worksheet, "Current_Inventory");
-
-            // Add a separate show checklist sheet
-            const showData = (selectedTour.shows || []).map(show => ({
-                Show: show.name,
-                Date: new Date(show.date).toLocaleDateString(),
-                Venue: show.venue || '',
-                'Start Count Completed': '',
-                'End Count Completed': '',
-                'Notes': ''
-            }));
-
-            const showSheet = xlsx.utils.json_to_sheet(showData);
-            xlsx.utils.book_append_sheet(workbook, showSheet, "Show_Checklist");
-
-            // Add summary sheet
-            const summaryData = [
-                { Metric: 'Tour Name', Value: selectedTour.name },
-                { Metric: 'Total Items', Value: merchItems.length },
-                { Metric: 'Total Variants', Value: merchItems.reduce((sum, item) => sum + item.variants.length, 0) },
-                { Metric: 'Total Inventory Value', Value: `$${inventoryData.reduce((sum, row) => sum + parseFloat(row['Total Value'].replace('$', '')), 0).toFixed(2)}` },
-                { Metric: 'Low Stock Items', Value: inventoryData.filter(row => row['Low Stock'] === 'YES').length },
-                { Metric: 'Export Date', Value: new Date().toLocaleString() }
-            ];
-
-            const summarySheet = xlsx.utils.json_to_sheet(summaryData);
-            xlsx.utils.book_append_sheet(workbook, summarySheet, "Summary");
-
-            xlsx.writeFile(workbook, `${selectedTour.name.replace(/\s+/g, '_')}_Inventory_${new Date().toISOString().split('T')[0]}.xlsx`);
-        });
-    };
-
-    const addVariant = () => {
-        setVariants([...variants, { size: '', type: '', quantity: '0' }]);
-    };
-
-    const removeVariant = (index: number) => {
-        setVariants(variants.filter((_, i) => i !== index));
-    };
-
-    const updateVariant = (index: number, field: string, value: string) => {
-        const updated = [...variants];
-        updated[index] = { ...updated[index], [field]: value };
-        setVariants(updated);
-    };
-
-    if (loading) {
+    if (loading || roleLoading) {
         return (
             <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
                 <p>Loading inventory...</p>
@@ -433,7 +249,7 @@ export default function InventoryPage() {
                     {merchItems.length > 0 && (
                         <button
                             className="btn btn-secondary"
-                            onClick={handleExportInventory}
+                            onClick={() => setShowExportModal(true)}
                             disabled={!selectedTourId}
                         >
                             📊 Export Excel
@@ -465,40 +281,7 @@ export default function InventoryPage() {
             </div>
 
             {/* Inventory Stats */}
-            <div className="inventory-stats">
-                <div className="inventory-stat">
-                    <div className="inventory-stat-value">{merchItems.length}</div>
-                    <div className="inventory-stat-label">Total Items</div>
-                </div>
-                <div className="inventory-stat">
-                    <div className="inventory-stat-value">
-                        {merchItems.reduce((sum, item) => sum + item.variants.length, 0)}
-                    </div>
-                    <div className="inventory-stat-label">Total Variants</div>
-                </div>
-                <div className="inventory-stat">
-                    <div className="inventory-stat-value">
-                        ${merchItems.reduce((sum, item) =>
-                            sum + item.variants.reduce((vSum, v) => {
-                                // Get the most recent inventory count for this variant
-                                const variantRecords = inventoryRecords.filter(r => r.variantId === v.id);
-                                let latestCount = v.quantity;
-
-                                if (variantRecords.length > 0) {
-                                    const sortedRecords = variantRecords.sort((a, b) =>
-                                        new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
-                                    );
-                                    const mostRecentRecord = sortedRecords[0];
-                                    latestCount = mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? v.quantity;
-                                }
-
-                                return vSum + (v.price * latestCount);
-                            }, 0), 0
-                        ).toFixed(2)}
-                    </div>
-                    <div className="inventory-stat-label">Total Value</div>
-                </div>
-            </div>
+            <InventoryStats merchItems={merchItems} inventoryRecords={inventoryRecords} />
 
             {/* Merch Items Grid */}
             {merchItems.length === 0 ? (
@@ -544,28 +327,14 @@ export default function InventoryPage() {
                                 </div>
                                 <div className="variant-list">
                                     {item.variants.map((variant) => {
-                                        // Get the most recent inventory count for this variant
-                                        const getLatestCount = (): number => {
-                                            const variantRecords = inventoryRecords.filter(r => r.variantId === variant.id);
-                                            if (variantRecords.length === 0) return variant.quantity;
-
-                                            // Sort by show date (most recent first)
-                                            const sortedRecords = variantRecords.sort((a, b) =>
-                                                new Date(b.show.date).getTime() - new Date(a.show.date).getTime()
-                                            );
-
-                                            const mostRecentRecord = sortedRecords[0];
-
-                                            // Use end count if available, otherwise start count, otherwise base quantity
-                                            return mostRecentRecord.endCount ?? mostRecentRecord.startCount ?? variant.quantity;
-                                        };
+                                        const count = latestVariantCounts.get(variant.id) ?? variant.quantity;
 
                                         return (
                                             <div key={variant.id} className="variant-item">
                                                 <span className="variant-name">
                                                     {variant.type ? `${variant.type} - ` : ''}{variant.size}
                                                 </span>
-                                                <span className="variant-quantity">Qty: {getLatestCount()}</span>
+                                                <span className="variant-quantity">Qty: {count}</span>
                                             </div>
                                         );
                                     })}
@@ -669,434 +438,44 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* New Item Modal */}
-            {showNewItemModal && (
-                <div className="modal-overlay" onClick={() => setShowNewItemModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
-                        <div className="modal-header">
-                            <h2>Add Merchandise Item</h2>
-                            <button className="close-btn" onClick={() => setShowNewItemModal(false)}>×</button>
-                        </div>
-                        <form onSubmit={handleCreateItem}>
-                            <div className="form-group">
-                                <label className="form-label">Item Name</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. Tour T-Shirt"
-                                    value={newItem.name}
-                                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Description (Optional)</label>
-                                <textarea
-                                    className="form-textarea"
-                                    placeholder="Describe the item..."
-                                    value={newItem.description}
-                                    onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                                    style={{ minHeight: '80px' }}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Image (Optional)</label>
-                                <input
-                                    type="file"
-                                    className="form-input"
-                                    accept="image/*"
-                                    disabled={uploading}
-                                />
-                                {uploading && (
-                                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                        Uploading image...
-                                    </p>
-                                )}
-                            </div>
+            <NewItemModal
+                isOpen={showNewItemModal}
+                onClose={() => setShowNewItemModal(false)}
+                selectedTourId={selectedTourId}
+                onItemCreated={(item) => setMerchItems([item, ...merchItems])}
+            />
 
-                            <div className="form-group">
-                                <label className="form-label">Price</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-input"
-                                    placeholder="e.g. 25.00"
-                                    value={newItem.price}
-                                    onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                                    required
-                                />
-                                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                    This price will apply to all variants
-                                </p>
-                            </div>
+            <EditItemModal
+                isOpen={showEditModal}
+                onClose={() => setShowEditModal(false)}
+                editingItem={editingItem}
+                setEditingItem={setEditingItem}
+                selectedTourId={selectedTourId}
+                selectedShowId={selectedShowId}
+                setSelectedShowId={setSelectedShowId}
+                tours={tours}
+                inventoryRecords={inventoryRecords}
+                onUpdateQuantities={handleUpdateQuantities}
+                onUpdateInventoryRecord={handleUpdateInventoryRecord}
+            />
 
-                            <div className="form-group">
-                                <label className="form-label">Variants (Sizes/Types)</label>
-                                {variants.map((variant, index) => (
-                                    <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Size (e.g. M, L, XL)"
-                                            value={variant.size}
-                                            onChange={(e) => updateVariant(index, 'size', e.target.value)}
-                                            required
-                                            style={{ flex: 1 }}
-                                        />
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Type (optional)"
-                                            value={variant.type}
-                                            onChange={(e) => updateVariant(index, 'type', e.target.value)}
-                                            style={{ flex: 1 }}
-                                        />
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            className="form-input"
-                                            placeholder="Quantity"
-                                            value={variant.quantity}
-                                            onChange={(e) => updateVariant(index, 'quantity', e.target.value)}
-                                            style={{ flex: 1 }}
-                                        />
+            <InventoryShowSelectModal
+                isOpen={showInventoryModal}
+                onClose={() => setShowInventoryModal(false)}
+                tours={tours}
+                selectedTourId={selectedTourId}
+                onSelectShow={handleInventoryForShow}
+            />
 
-                                        {variants.length > 1 && (
-                                            <button
-                                                type="button"
-                                                className="btn btn-secondary"
-                                                onClick={() => removeVariant(index)}
-                                                style={{ padding: '0.75rem' }}
-                                            >
-                                                ×
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary btn-small"
-                                    onClick={addVariant}
-                                    style={{ marginTop: '0.5rem' }}
-                                >
-                                    + Add Variant
-                                </button>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowNewItemModal(false)}
-                                    disabled={submitting}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={submitting || uploading}>
-                                    {submitting ? 'Creating...' : uploading ? 'Uploading...' : 'Create Item'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Item Modal */}
-            {showEditModal && editingItem && (
-                <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
-                        <div className="modal-header">
-                            <h2>
-                                {selectedShowId ? 'Show Inventory Tracking' : 'Edit Quantities'} - {editingItem.name}
-                            </h2>
-                            <button className="close-btn" onClick={() => setShowEditModal(false)}>×</button>
-                        </div>
-                        <div style={{ padding: '1.5rem' }}>
-                            {selectedShowId && (
-                                <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
-                                    <strong>Show: </strong>
-                                    {tours.find(t => t.id === selectedTourId)?.shows?.find(s => s.id === selectedShowId)?.name}
-                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                        {(() => {
-                                            const show = tours.find(t => t.id === selectedTourId)?.shows?.find(s => s.id === selectedShowId);
-                                            return show?.date ? new Date(show.date).toLocaleDateString() : '';
-                                        })()}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="form-group">
-                                <label className="form-label">
-                                    {selectedShowId ? 'Inventory Counts' : 'Update Quantities'}
-                                </label>
-                                {editingItem.variants.map((variant, index) => {
-                                    const existingRecord = inventoryRecords.find(r =>
-                                        r.variantId === variant.id && r.showId === selectedShowId
-                                    );
-
-                                    // Calculate smart default start count
-                                    const getDefaultStartCount = (): number => {
-                                        if (existingRecord?.startCount !== undefined) {
-                                            return existingRecord.startCount;
-                                        }
-
-                                        // Find previous shows for this tour, sorted by date
-                                        const currentTour = tours.find(t => t.id === selectedTourId);
-                                        const selectedShow = currentTour?.shows.find(s => s.id === selectedShowId);
-
-                                        if (!currentTour || !selectedShow) return variant.quantity;
-
-                                        const previousShows = (currentTour.shows || [])
-                                            .filter(s => new Date(s.date) < new Date(selectedShow.date))
-                                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                                        // Look for the most recent previous show with an end count for this variant
-                                        for (const prevShow of previousShows) {
-                                            const prevRecord = inventoryRecords.find(r =>
-                                                r.variantId === variant.id && r.showId === prevShow.id && r.endCount !== null
-                                            );
-                                            if (prevRecord && prevRecord.endCount !== null) {
-                                                return prevRecord.endCount;
-                                            }
-                                        }
-
-                                        // No previous show or no end count found, use current tracked inventory
-                                        return variant.quantity;
-                                    };
-
-                                    const defaultStartCount = getDefaultStartCount();
-
-                                    return (
-                                        <div key={variant.id} style={{
-                                            marginBottom: '1.5rem',
-                                            padding: '1rem',
-                                            backgroundColor: 'var(--bg-secondary)',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-subtle)'
-                                        }}>
-                                            <div style={{ marginBottom: '1rem' }}>
-                                                <strong>{variant.type ? `${variant.type} - ` : ''}{variant.size}</strong>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                                    ${variant.price.toFixed(2)} • Available: {variant.quantity}
-                                                </div>
-                                            </div>
-
-                                            {selectedShowId ? (
-                                                // Simplified show-specific inventory tracking for sellers
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'end' }}>
-                                                    <div>
-                                                        <label style={{
-                                                            fontSize: '0.875rem',
-                                                            color: 'var(--text-primary)',
-                                                            marginBottom: '0.5rem',
-                                                            display: 'block'
-                                                        }}>
-                                                            Start Count
-                                                        </label>
-                                                        <p style={{
-                                                            fontSize: '0.75rem',
-                                                            color: 'var(--text-secondary)',
-                                                            marginBottom: '0.5rem'
-                                                        }}>
-                                                            Count before show
-                                                        </p>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            className="form-input"
-                                                            value={existingRecord?.startCount !== undefined && existingRecord?.startCount !== null
-                                                                ? existingRecord.startCount
-                                                                : defaultStartCount}
-                                                            onChange={(e) => {
-                                                                handleUpdateInventoryRecord(variant.id, {
-                                                                    startCount: parseInt(e.target.value) || 0
-                                                                });
-                                                            }}
-                                                            style={{ fontSize: '0.875rem', padding: '0.75rem' }}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label style={{
-                                                            fontSize: '0.875rem',
-                                                            color: 'var(--text-primary)',
-                                                            marginBottom: '0.5rem',
-                                                            display: 'block'
-                                                        }}>
-                                                            End Count
-                                                        </label>
-                                                        <p style={{
-                                                            fontSize: '0.75rem',
-                                                            color: 'var(--text-secondary)',
-                                                            marginBottom: '0.5rem'
-                                                        }}>
-                                                            Count after show
-                                                        </p>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            className="form-input"
-                                                            value={existingRecord?.endCount !== undefined && existingRecord?.endCount !== null
-                                                                ? existingRecord.endCount
-                                                                : ''}
-                                                            onChange={(e) => {
-                                                                handleUpdateInventoryRecord(variant.id, {
-                                                                    endCount: parseInt(e.target.value) || 0
-                                                                });
-                                                            }}
-                                                            style={{ fontSize: '0.875rem', padding: '0.75rem' }}
-                                                        />
-                                                    </div>
-
-                                                    {/* Calculate and display sold count */}
-                                                    {(() => {
-                                                        const startCount = existingRecord?.startCount;
-                                                        const endCount = existingRecord?.endCount;
-
-                                                        // Only show if we have both counts
-                                                        if (startCount !== null && startCount !== undefined &&
-                                                            endCount !== null && endCount !== undefined) {
-                                                            const calculatedSold = startCount - endCount;
-                                                            return (
-                                                                <div style={{
-                                                                    gridColumn: 'span 2',
-                                                                    marginTop: '1rem',
-                                                                    textAlign: 'center',
-                                                                    padding: '1rem',
-                                                                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                                                                    borderRadius: '8px'
-                                                                }}>
-                                                                    <span style={{
-                                                                        fontSize: '1rem',
-                                                                        color: 'var(--accent-gold)',
-                                                                        fontWeight: 'bold'
-                                                                    }}>
-                                                                        Items Sold: {calculatedSold}
-                                                                    </span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
-                                                </div>
-                                            ) : (
-                                                // General quantity editing for managers
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    className="form-input"
-                                                    placeholder="Quantity"
-                                                    defaultValue={variant.quantity}
-                                                    onChange={(e) => {
-                                                        const updatedVariants = [...editingItem.variants];
-                                                        updatedVariants[index] = { ...updatedVariants[index], quantity: parseInt(e.target.value) || 0 };
-                                                        setEditingItem({ ...editingItem, variants: updatedVariants });
-                                                    }}
-                                                    style={{ width: '100px' }}
-                                                />
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => {
-                                        setShowEditModal(false);
-                                        setSelectedShowId(null);
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                {!selectedShowId && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        onClick={() => handleUpdateQuantities(editingItem.id, editingItem.variants)}
-                                    >
-                                        Update Quantities
-                                    </button>
-                                )}
-                                {selectedShowId && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        onClick={() => {
-                                            setShowEditModal(false);
-                                            setSelectedShowId(null);
-                                        }}
-                                    >
-                                        Done
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Show Selection Modal for Sellers */}
-            {showInventoryModal && editingItem && (
-                <div className="modal-overlay" onClick={() => setShowInventoryModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-                        <div className="modal-header">
-                            <h2>Select Show - {editingItem.name}</h2>
-                            <button className="close-btn" onClick={() => setShowInventoryModal(false)}>×</button>
-                        </div>
-                        <div style={{ padding: '1.5rem' }}>
-                            <div className="form-group">
-                                <label className="form-label">Choose the show to track inventory for:</label>
-                                {(tours.find(t => t.id === selectedTourId)?.shows || []).map((show) => (
-                                    <button
-                                        key={show.id}
-                                        onClick={() => handleInventoryForShow(show.id)}
-                                        style={{
-                                            width: '100%',
-                                            padding: '1rem',
-                                            marginBottom: '0.5rem',
-                                            background: 'var(--bg-secondary)',
-                                            border: '1px solid var(--border-subtle)',
-                                            borderRadius: 'var(--radius-md)',
-                                            color: 'var(--text-primary)',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                                            e.currentTarget.style.background = 'var(--bg-secondary)';
-                                        }}
-                                    >
-                                        <div style={{ fontWeight: 'bold' }}>{show.name}</div>
-                                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                            {new Date(show.date).toLocaleDateString()}
-                                        </div>
-                                        {show.venue && (
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                                {show.venue}
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowInventoryModal(false)}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ExportModal
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                tours={tours}
+                selectedTourId={selectedTourId}
+                merchItems={merchItems}
+                inventoryRecords={inventoryRecords}
+                user={user ?? { name: undefined }}
+            />
         </div>
     );
 }

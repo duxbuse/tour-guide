@@ -1,5 +1,7 @@
 import { auth0 } from '@/lib/auth0';
+import db from '@/lib/db';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import React from 'react';
 
 type Role = 'Manager' | 'Seller';
@@ -16,18 +18,33 @@ export async function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
         redirect('/api/auth/login');
     }
 
-    // Note: This depends on the Auth0 Action adding roles to the user object
-    // The namespace should match what was configured in the Auth0 Action
-    const userRoles = (session.user['https://tour-guide.app/roles'] as string[]) || [];
+    // Get user from database to check role
+    let user = await db.user.findUnique({
+        where: { auth0Id: session.user.sub }
+    });
 
-    // Also check for roles in the standard location if the custom claim isn't present
-    // This is a fallback in case the Action isn't set up exactly as described
-    const standardRoles = ((session.user as any).roles as string[]) || []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    // If user doesn't exist in database, create them with Manager role
+    if (!user) {
+        user = await db.user.create({
+            data: {
+                auth0Id: session.user.sub,
+                email: session.user.email!,
+                name: session.user.name || session.user.email!,
+                role: 'MANAGER', // Default role for new users
+            }
+        });
+    }
 
-    const allUserRoles = [...userRoles, ...standardRoles];
+    // Check for demo mode override
+    const cookieStore = await cookies();
+    const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+    const demoUserType = cookieStore.get('demo_user_type')?.value;
 
+    const userRole = (isDemo && demoUserType) ? demoUserType : user.role;
+
+    // Check if user has one of the allowed roles
     const hasAccess = allowedRoles.some(role =>
-        allUserRoles.map(r => r.toLowerCase()).includes(role.toLowerCase())
+        role.toLowerCase() === userRole.toLowerCase()
     );
 
     if (!hasAccess) {
@@ -47,6 +64,9 @@ export async function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
                 </p>
                 <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                     Required roles: {allowedRoles.join(', ')}
+                </p>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    Your role: {userRole}
                 </p>
             </div>
         );

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
         // Sort variants with proper size ordering
         const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-        
+
         merchItems.forEach(item => {
             item.variants.sort((a, b) => {
                 // First sort by type
@@ -58,16 +59,16 @@ export async function GET(request: NextRequest) {
                 if (typeA !== typeB) {
                     return typeA.localeCompare(typeB);
                 }
-                
+
                 // Then sort by size using proper order
                 const sizeIndexA = sizeOrder.indexOf(a.size.toUpperCase());
                 const sizeIndexB = sizeOrder.indexOf(b.size.toUpperCase());
-                
+
                 // If size found in order array, use that position
                 if (sizeIndexA !== -1 && sizeIndexB !== -1) {
                     return sizeIndexA - sizeIndexB;
                 }
-                
+
                 // If one or both sizes not in array, fall back to alphabetical
                 return a.size.localeCompare(b.size);
             });
@@ -107,14 +108,23 @@ export async function POST(request: NextRequest) {
 
         // Check if user has manager role for creating items
         const userRoles = getUserRoles(auth0User);
-        const isManager = userRoles.includes('manager');
+        let isManager = userRoles.includes('manager');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+        }
 
         if (!isManager) {
             return NextResponse.json({ error: 'Access denied. Manager role required to create items.' }, { status: 403 });
         }
 
         const body = await request.json();
-        const { tourId, name, description, imageUrl, variants } = body;
+        const { tourId, name, description, imageUrl, category, variants } = body;
 
         if (!tourId || !name || !variants || variants.length === 0) {
             return NextResponse.json(
@@ -140,6 +150,7 @@ export async function POST(request: NextRequest) {
                 name,
                 description,
                 imageUrl,
+                category,
                 tourId,
                 variants: {
                     create: variants.map((v: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -182,7 +193,16 @@ export async function DELETE(request: NextRequest) {
 
         // Check if user has manager role for deleting items
         const userRoles = getUserRoles(auth0User);
-        const isManager = userRoles.includes('manager');
+        let isManager = userRoles.includes('manager');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+        }
 
         if (!isManager) {
             return NextResponse.json({ error: 'Access denied. Manager role required to delete items.' }, { status: 403 });
@@ -241,15 +261,25 @@ export async function PUT(request: NextRequest) {
 
         // Check if user has permission to edit quantities (manager or seller)
         const userRoles = getUserRoles(auth0User);
-        const isManager = userRoles.includes('manager');
-        const isSeller = userRoles.includes('seller');
+        let isManager = userRoles.includes('manager');
+        let isSeller = userRoles.includes('seller');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+            isSeller = demoUserType === 'seller';
+        }
 
         if (!isManager && !isSeller) {
             return NextResponse.json({ error: 'Access denied. Manager or Seller role required to edit quantities.' }, { status: 403 });
         }
 
         const body = await request.json();
-        const { id, name, description, imageUrl, variants } = body;
+        const { id, name, description, imageUrl, category, variants } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Merch item ID is required' }, { status: 400 });
@@ -279,6 +309,7 @@ export async function PUT(request: NextRequest) {
                 ...(name && { name }),
                 ...(description !== undefined && { description }),
                 ...(imageUrl !== undefined && { imageUrl }),
+                ...(category !== undefined && { category }),
             },
             include: {
                 variants: true,
@@ -314,7 +345,7 @@ export async function PUT(request: NextRequest) {
         if (finalItem) {
             // Sort variants with proper size ordering
             const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-            
+
             finalItem.variants.sort((a, b) => {
                 // First sort by type
                 const typeA = a.type || '';
@@ -322,16 +353,16 @@ export async function PUT(request: NextRequest) {
                 if (typeA !== typeB) {
                     return typeA.localeCompare(typeB);
                 }
-                
+
                 // Then sort by size using proper order
                 const sizeIndexA = sizeOrder.indexOf(a.size.toUpperCase());
                 const sizeIndexB = sizeOrder.indexOf(b.size.toUpperCase());
-                
+
                 // If size found in order array, use that position
                 if (sizeIndexA !== -1 && sizeIndexB !== -1) {
                     return sizeIndexA - sizeIndexB;
                 }
-                
+
                 // If one or both sizes not in array, fall back to alphabetical
                 return a.size.localeCompare(b.size);
             });

@@ -7,6 +7,8 @@ async function main() {
 
   try {
     // Clear existing data
+    await prisma.sellerAssignment.deleteMany();
+    await prisma.invitation.deleteMany();
     await prisma.inventoryRecord.deleteMany();
     await prisma.merchVariant.deleteMany();
     await prisma.merchItem.deleteMany();
@@ -371,6 +373,7 @@ async function main() {
         name: 'Summer World Tour 2024 T-Shirt',
         description: 'Official unisex tour t-shirt with city-specific designs and tour dates',
         imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: summerTour.id
       }
     });
@@ -380,6 +383,7 @@ async function main() {
         name: 'Summer Tour Hoodie',
         description: 'Premium cotton blend hoodie with embroidered tour logo',
         imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: summerTour.id
       }
     });
@@ -389,6 +393,7 @@ async function main() {
         name: 'Summer Concert Poster',
         description: 'Limited edition holographic concert poster',
         imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop&crop=center',
+        category: 'MEDIA',
         tourId: summerTour.id
       }
     });
@@ -399,6 +404,7 @@ async function main() {
         name: "Men's European Tour Shirt",
         description: 'Tailored fit men\'s shirt with European flag design',
         imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: springTour.id
       }
     });
@@ -408,6 +414,7 @@ async function main() {
         name: "Women's European Tour Shirt",
         description: 'Fitted women\'s shirt with floral European motif',
         imageUrl: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: springTour.id
       }
     });
@@ -417,6 +424,7 @@ async function main() {
         name: 'European Tour Tote Bag',
         description: 'Canvas tote bag with tour cities map',
         imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop&crop=center',
+        category: 'ACCESSORIES',
         tourId: springTour.id
       }
     });
@@ -427,6 +435,7 @@ async function main() {
         name: "Men's Asia Pacific Tour Tee",
         description: 'Men\'s shirt featuring Asian-inspired artwork',
         imageUrl: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: fallTour.id
       }
     });
@@ -436,6 +445,7 @@ async function main() {
         name: "Women's Asia Pacific Tour Tee",
         description: 'Women\'s fitted tee with cherry blossom design',
         imageUrl: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: fallTour.id
       }
     });
@@ -445,6 +455,7 @@ async function main() {
         name: 'Asia Pacific Tour Snapback',
         description: 'Embroidered snapback cap with Japanese script',
         imageUrl: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=400&fit=crop&crop=center',
+        category: 'ACCESSORIES',
         tourId: fallTour.id
       }
     });
@@ -454,6 +465,7 @@ async function main() {
         name: 'Live in Tokyo Vinyl',
         description: 'Limited edition live recording from Tokyo Dome',
         imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop&crop=center',
+        category: 'MEDIA',
         tourId: fallTour.id
       }
     });
@@ -464,6 +476,7 @@ async function main() {
         name: 'Holiday Tour Long Sleeve',
         description: 'Festive long sleeve shirt with holiday tour artwork',
         imageUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop&crop=center',
+        category: 'APPAREL',
         tourId: winterTour.id
       }
     });
@@ -473,6 +486,7 @@ async function main() {
         name: 'Winter Tour Knit Scarf',
         description: 'Warm knit scarf with tour logo embroidery',
         imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400&h=400&fit=crop&crop=center',
+        category: 'ACCESSORIES',
         tourId: winterTour.id
       }
     });
@@ -720,7 +734,7 @@ async function main() {
 
     // Spring tour inventory - Sequential records to show shrinkage between shows
     console.log('📊 Creating Spring tour sequential inventory with shrinkage...');
-    
+
     // Men's M shirts progression across all shows with shrinkage
     await Promise.all([
       // Barcelona: Start 25, sell 4, end 19 (2 lost)
@@ -846,7 +860,7 @@ async function main() {
 
     // Winter tour inventory (NO SALES - future tour, but add lost items from prep/transport)
     console.log('📦 Adding winter tour inventory with lost items (no sales)...');
-    
+
     const winterInventoryData = [
       // Pre-tour inventory shipment losses during transport/setup
       { startCount: 50, endCount: 47, addedCount: 0, soldCount: 0, showId: winterShows[0].id, variantId: winterShirtVariants[0].id }, // S - 3 lost in transit
@@ -860,7 +874,7 @@ async function main() {
 
     // Add more comprehensive lost items across other tours
     console.log('📉 Adding additional lost items across all tours...');
-    
+
     const additionalLostItemsData = [
       // Summer tour additional losses - using different shows/variants to avoid duplicates
       { startCount: 50, endCount: 45, addedCount: 0, soldCount: 3, showId: summerShows[3].id, variantId: summerPosterVariant.id }, // NYC Posters - 2 damaged
@@ -868,14 +882,14 @@ async function main() {
       { startCount: 38, endCount: 30, addedCount: 0, soldCount: 6, showId: summerShows[5].id, variantId: summerPosterVariant.id }, // Toronto Posters - 2 damaged
       { startCount: 18, endCount: 12, addedCount: 0, soldCount: 4, showId: summerShows[2].id, variantId: summerHoodieVariants[2].id }, // Berlin L Hoodie - 2 lost
       { startCount: 15, endCount: 10, addedCount: 0, soldCount: 3, showId: summerShows[3].id, variantId: summerHoodieVariants[3].id }, // NYC XL Hoodie - 2 damaged
-      
+
       // Spring tour additional losses - using different shows/variants
       { startCount: 25, endCount: 18, addedCount: 0, soldCount: 5, showId: springShows[3].id, variantId: springToteVariant.id }, // Vienna Totes - 2 lost
       { startCount: 18, endCount: 12, addedCount: 0, soldCount: 4, showId: springShows[4].id, variantId: springToteVariant.id }, // Budapest Totes - 2 stolen
       { startCount: 15, endCount: 11, addedCount: 0, soldCount: 3, showId: springShows[1].id, variantId: springWomensVariants[0].id }, // Amsterdam XS Womens - 1 lost
       { startCount: 12, endCount: 8, addedCount: 0, soldCount: 3, showId: springShows[4].id, variantId: springWomensVariants[3].id }, // Budapest L Womens - 1 damaged
       { startCount: 20, endCount: 15, addedCount: 0, soldCount: 4, showId: springShows[0].id, variantId: springMensVariants[0].id }, // Barcelona S Mens - 1 lost
-      
+
       // Fall tour additional losses - using different shows/variants (avoiding duplicates)
       { startCount: 15, endCount: 10, addedCount: 0, soldCount: 3, showId: fallShows[3].id, variantId: fallMensVariants[0].id }, // Osaka S Mens - 2 lost
       { startCount: 20, endCount: 15, addedCount: 0, soldCount: 3, showId: fallShows[4].id, variantId: fallWomensVariants[0].id }, // Seoul XS Womens - 2 stolen
@@ -885,7 +899,31 @@ async function main() {
     await Promise.all(additionalLostItemsData.map(record => prisma.inventoryRecord.create({ data: record })));
 
     console.log('✅ Database seeding completed successfully!');
-    
+
+    // Create seller assignments - assign test seller to all shows
+    console.log('👥 Creating seller assignments...');
+
+    const seller = await prisma.user.findUnique({
+      where: { email: 'seller@test.com' }
+    });
+
+    if (seller) {
+      const allShows = [...summerShows, ...springShows, ...fallShows, ...winterShows];
+
+      await Promise.all(
+        allShows.map(show =>
+          prisma.sellerAssignment.create({
+            data: {
+              sellerId: seller.id,
+              showId: show.id,
+            },
+          })
+        )
+      );
+
+      console.log(`✅ Assigned seller to all ${allShows.length} shows`);
+    }
+
     // Enhanced summary
     console.log('\n📋 Comprehensive test data summary:');
     console.log(`👤 Users: 2 (Manager & Seller with proper Auth0 IDs)`);
@@ -899,7 +937,7 @@ async function main() {
     console.log(`📐 Variants: 35+ variants (includes male/female options)`);
     console.log(`📊 Inventory Records: 45+ with sales AND comprehensive shrinkage/loss data`);
     console.log(`💰 Price ranges: $15-45 across different item types`);
-    
+
     console.log('\n🧪 Enhanced test scenarios:');
     console.log(`• Smart defaults: T-shirt progression with shrinkage losses`);
     console.log(`• Gender variants: Male/female shirts in Spring & Fall tours`);

@@ -60,7 +60,7 @@ export default function ResponsiveNavBar({ user }: ResponsiveNavBarProps) {
             </div>
 
             <div className="navbar-right desktop-only">
-                <UserInfo />
+                <UserInfo user={user} />
             </div>
 
             <button
@@ -140,7 +140,7 @@ export default function ResponsiveNavBar({ user }: ResponsiveNavBarProps) {
                         </div>
                     )}
                     <div className="mobile-user-info">
-                        <UserInfo />
+                        <UserInfo user={user} />
                     </div>
                 </div>
             </div>

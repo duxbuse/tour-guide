@@ -15,7 +15,10 @@ model User {
   role      String   @default("SELLER")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  tours     Tour[]
+  
+  tours              Tour[]
+  sellerAssignments  SellerAssignment[]
+  sentInvitations    Invitation[]       @relation("SentInvitations")
 
   @@index([auth0Id])
   @@index([email])
@@ -57,7 +60,8 @@ model Show {
   tourId    String
   tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
   
-  inventoryRecords InventoryRecord[]
+  inventoryRecords   InventoryRecord[]
+  sellerAssignments  SellerAssignment[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -67,11 +71,18 @@ model Show {
   @@index([tourId, date])
 }
 
+enum Category {
+  APPAREL
+  ACCESSORIES
+  MEDIA
+}
+
 model MerchItem {
   id        String   @id @default(cuid())
   name      String
   description String?
   imageUrl  String?  // Vercel Blob URL
+  category  Category @default(APPAREL)
   
   tourId    String
   tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
@@ -109,8 +120,9 @@ model InventoryRecord {
   startCount Int     @default(0)
   addedCount Int     @default(0)
   endCount   Int?    // Null until counted
+  shrinkage  Int     @default(0) // Damage/Theft
   
-  soldCount  Int?    // Calculated: start + added - end
+  soldCount  Int?    // Calculated: start + added - end - shrinkage
   
   showId    String
   show      Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
@@ -125,4 +137,38 @@ model InventoryRecord {
   @@index([showId])
   @@index([variantId])
   @@index([updatedAt])
+}
+
+model SellerAssignment {
+  id        String   @id @default(cuid())
+  
+  sellerId  String
+  seller    User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  
+  showId    String
+  show      Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([sellerId, showId])
+  @@index([sellerId])
+  @@index([showId])
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  email     String
+  role      String   @default("SELLER")
+  status    String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  token     String   @unique
+  
+  managerId String
+  manager   User     @relation("SentInvitations", fields: [managerId], references: [id], onDelete: Cascade)
+  
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([email])
+  @@index([token])
+  @@index([managerId])
 }

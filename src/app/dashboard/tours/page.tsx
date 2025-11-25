@@ -2,15 +2,28 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { auth0 } from '@/lib/auth0';
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUserRole } from '@/hooks/useUserRole';
 import { ToursSkeleton } from '@/components/LoadingSkeleton';
 import DropdownMenu from '@/components/DropdownMenu';
+import InviteSellerModal from '@/components/sellers/InviteSellerModal';
+import ManageAssignmentsModal from '@/components/sellers/ManageAssignmentsModal';
+import CreateTourModal from '@/components/tours/modals/CreateTourModal';
+import CreateShowModal from '@/components/tours/modals/CreateShowModal';
+import EditShowModal from '@/components/tours/modals/EditShowModal';
 
 interface Show {
     id: string;
     name: string;
     date: string;
     venue: string | null;
+    sellerAssignments?: Array<{
+        seller: {
+            id: string;
+            email: string;
+            name: string | null;
+        };
+    }>;
 }
 
 interface Tour {
@@ -27,6 +40,8 @@ interface Tour {
 }
 
 export default function ToursPage() {
+    const { user, isLoading: userLoading } = useUser();
+    const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [loading, setLoading] = useState(true);
     const [showNewTourModal, setShowNewTourModal] = useState(false);
@@ -34,56 +49,20 @@ export default function ToursPage() {
     const [showEditShowModal, setShowEditShowModal] = useState(false);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
     const [editingShow, setEditingShow] = useState<Show | null>(null);
-    const [submitting, setSubmitting] = useState(false);
     const [editingTourId, setEditingTourId] = useState<string | null>(null);
     const [editingTourName, setEditingTourName] = useState('');
     const [openOptionsMenu, setOpenOptionsMenu] = useState<string | null>(null);
     const [openShowMenu, setOpenShowMenu] = useState<string | null>(null);
-    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [showInviteSellerModal, setShowInviteSellerModal] = useState(false);
+    const [showManageAssignmentsModal, setShowManageAssignmentsModal] = useState(false);
+    const [selectedTourForAssignments, setSelectedTourForAssignments] = useState<{ id: string, name: string } | null>(null);
 
     // Refs for dropdown triggers
     const tourMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
     const showMenuRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
-    useEffect(() => {
-        // Get current user from auth service
-        const fetchUser = async () => {
-            const session = await auth0.getSession();
-            if (session?.user) {
-                setUser(session.user);
-            }
-        };
-        fetchUser();
-    }, []);
-
     // Check user role - Only managers can edit/delete shows
-    const getUserRoles = (): string[] => {
-        if (!user) return [];
-        const customRoles = (user['https://tour-guide.app/roles'] as string[]) || [];
-        const standardRoles = (user.roles as string[]) || [];
-        return [...customRoles, ...standardRoles].map(r => r.toLowerCase());
-    };
-
-    const userRoles = getUserRoles();
-    const isManager = userRoles.includes('manager');
-
-    const [newTour, setNewTour] = useState({
-        name: '',
-        startDate: '',
-        endDate: '',
-    });
-
-    const [newShow, setNewShow] = useState({
-        name: '',
-        date: '',
-        venue: '',
-    });
-
-    const [editShow, setEditShow] = useState({
-        name: '',
-        date: '',
-        venue: '',
-    });
+    const isManager = role?.toLowerCase() === 'manager';
 
     useEffect(() => {
         fetchTours();
@@ -104,79 +83,17 @@ export default function ToursPage() {
         }
     };
 
-    const handleCreateTour = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSubmitting(true);
-
-        try {
-            const response = await fetch('/api/tours', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newTour),
-            });
-
-            if (response.ok) {
-                const tour = await response.json();
-                setTours([tour, ...tours]);
-                setShowNewTourModal(false);
-                setNewTour({ name: '', startDate: '', endDate: '' });
-            }
-        } catch (error) {
-            console.error('Error creating tour:', error);
-        } finally {
-            setSubmitting(false);
-        }
+    const handleTourCreated = (tour: Tour) => {
+        setTours([tour, ...tours]);
     };
 
-    const handleCreateShow = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedTourId) return;
-
-        // Client-side validation
-        const selectedTour = tours.find(tour => tour.id === selectedTourId);
-        if (selectedTour && newShow.date) {
-            const showDate = new Date(newShow.date);
-
-            if (selectedTour.startDate && showDate < new Date(selectedTour.startDate)) {
-                alert(`Show date must be after the tour start date (${selectedTour.startDate})`);
-                return;
-            }
-
-            if (selectedTour.endDate && showDate > new Date(selectedTour.endDate)) {
-                alert(`Show date must be before the tour end date (${selectedTour.endDate})`);
-                return;
-            }
-        }
-
-        setSubmitting(true);
-
-        try {
-            const response = await fetch(`/api/tours/${selectedTourId}/shows`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newShow),
-            });
-
-            if (response.ok) {
-                const show = await response.json();
-                setTours(tours.map(tour =>
-                    tour.id === selectedTourId
-                        ? { ...tour, shows: [...(tour.shows || []), show] }
-                        : tour
-                ));
-                setShowNewShowModal(false);
-                setNewShow({ name: '', date: '', venue: '' });
-                setSelectedTourId(null);
-            } else {
-                const errorData = await response.json();
-                alert(errorData.error || 'Failed to create show');
-            }
-        } catch (error) {
-            console.error('Error creating show:', error);
-            alert('Failed to create show. Please try again.');
-        } finally {
-            setSubmitting(false);
-        }
+    const handleShowCreated = (show: Show, tourId: string) => {
+        setTours(tours.map(tour =>
+            tour.id === tourId
+                ? { ...tour, shows: [...(tour.shows || []), show] }
+                : tour
+        ));
+        setSelectedTourId(null);
     };
 
     const handleTourDoubleClick = (tour: Tour) => {
@@ -254,69 +171,22 @@ export default function ToursPage() {
     const openEditShowModal = (show: Show, tourId: string) => {
         setEditingShow(show);
         setSelectedTourId(tourId);
-        setEditShow({
-            name: show.name,
-            date: show.date.split('T')[0], // Convert to YYYY-MM-DD format
-            venue: show.venue || '',
-        });
         setShowEditShowModal(true);
     };
 
-    const handleUpdateShow = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedTourId || !editingShow) return;
-
-        // Client-side validation
-        const selectedTour = tours.find(tour => tour.id === selectedTourId);
-        if (selectedTour && editShow.date) {
-            const showDate = new Date(editShow.date);
-
-            if (selectedTour.startDate && showDate < new Date(selectedTour.startDate)) {
-                alert(`Show date must be after the tour start date (${selectedTour.startDate})`);
-                return;
-            }
-
-            if (selectedTour.endDate && showDate > new Date(selectedTour.endDate)) {
-                alert(`Show date must be before the tour end date (${selectedTour.endDate})`);
-                return;
-            }
-        }
-
-        setSubmitting(true);
-
-        try {
-            const response = await fetch(`/api/tours/${selectedTourId}/shows/${editingShow.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editShow),
-            });
-
-            if (response.ok) {
-                const updatedShow = await response.json();
-                setTours(tours.map(tour =>
-                    tour.id === selectedTourId
-                        ? {
-                            ...tour,
-                            shows: (tour.shows || []).map(show =>
-                                show.id === editingShow.id ? updatedShow : show
-                            )
-                        }
-                        : tour
-                ));
-                setShowEditShowModal(false);
-                setEditShow({ name: '', date: '', venue: '' });
-                setEditingShow(null);
-                setSelectedTourId(null);
-            } else {
-                const errorData = await response.json();
-                alert(errorData.error || 'Failed to update show');
-            }
-        } catch (error) {
-            console.error('Error updating show:', error);
-            alert('Failed to update show. Please try again.');
-        } finally {
-            setSubmitting(false);
-        }
+    const handleShowUpdated = (updatedShow: Show, tourId: string) => {
+        setTours(tours.map(tour =>
+            tour.id === tourId
+                ? {
+                    ...tour,
+                    shows: (tour.shows || []).map(show =>
+                        show.id === updatedShow.id ? updatedShow : show
+                    )
+                }
+                : tour
+        ));
+        setEditingShow(null);
+        setSelectedTourId(null);
     };
 
     const handleDeleteShow = async (show: Show, tourId: string) => {
@@ -345,7 +215,7 @@ export default function ToursPage() {
         }
     };
 
-    if (loading) {
+    if (loading || roleLoading) {
         return <ToursSkeleton />;
     }
 
@@ -492,6 +362,57 @@ export default function ToursPage() {
                                                     + Add Show
                                                 </button>
                                                 <button
+                                                    onClick={() => {
+                                                        setShowInviteSellerModal(true);
+                                                        setOpenOptionsMenu(null);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem 1rem',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--text-primary)',
+                                                        cursor: 'pointer',
+                                                        textAlign: 'left',
+                                                        fontSize: '0.875rem',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    👥 Invite Seller
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedTourForAssignments({ id: tour.id, name: tour.name });
+                                                        setShowManageAssignmentsModal(true);
+                                                        setOpenOptionsMenu(null);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem 1rem',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--text-primary)',
+                                                        cursor: 'pointer',
+                                                        textAlign: 'left',
+                                                        fontSize: '0.875rem',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    📋 Manage Assignments
+                                                </button>
+                                                <button
                                                     onClick={() => handleDeleteTour(tour.id)}
                                                     style={{
                                                         width: '100%',
@@ -527,6 +448,7 @@ export default function ToursPage() {
                                                 <th>City</th>
                                                 <th>Date</th>
                                                 <th>Venue</th>
+                                                {isManager && <th>Sellers</th>}
                                                 {isManager && <th>Actions</th>}
                                             </tr>
                                         </thead>
@@ -536,6 +458,31 @@ export default function ToursPage() {
                                                     <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{show.name}</td>
                                                     <td>{format(new Date(show.date), 'MMM d, yyyy')}</td>
                                                     <td>{show.venue || '-'}</td>
+                                                    {isManager && (
+                                                        <td>
+                                                            {show.sellerAssignments && show.sellerAssignments.length > 0 ? (
+                                                                <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                                                    {show.sellerAssignments.map((assignment) => (
+                                                                        <span
+                                                                            key={assignment.seller.id}
+                                                                            className="badge badge-info"
+                                                                            title={assignment.seller.email}
+                                                                            style={{
+                                                                                fontSize: '0.75rem',
+                                                                                padding: '0.25rem 0.5rem',
+                                                                            }}
+                                                                        >
+                                                                            {assignment.seller.name || assignment.seller.email.split('@')[0]}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                                                                    No sellers
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                     {isManager && (
                                                         <td>
                                                             <div style={{ position: 'relative' }}>
@@ -638,255 +585,46 @@ export default function ToursPage() {
                 </div>
             )}
 
-            {/* New Tour Modal */}
-            {showNewTourModal && (
-                <div className="modal-overlay" onClick={() => setShowNewTourModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Create New Tour</h2>
-                            <button className="close-btn" onClick={() => setShowNewTourModal(false)}>×</button>
-                        </div>
-                        <form onSubmit={handleCreateTour}>
-                            <div className="form-group">
-                                <label className="form-label">Tour Name</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. Summer Tour 2024"
-                                    value={newTour.name}
-                                    onChange={(e) => setNewTour({ ...newTour, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">Start Date</label>
-                                    <input
-                                        type="date"
-                                        className="form-input"
-                                        value={newTour.startDate}
-                                        onChange={(e) => setNewTour({ ...newTour, startDate: e.target.value })}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">End Date</label>
-                                    <input
-                                        type="date"
-                                        className="form-input"
-                                        value={newTour.endDate}
-                                        onChange={(e) => setNewTour({ ...newTour, endDate: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowNewTourModal(false)}
-                                    disabled={submitting}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? 'Creating...' : 'Create Tour'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <CreateTourModal
+                isOpen={showNewTourModal}
+                onClose={() => setShowNewTourModal(false)}
+                onTourCreated={handleTourCreated}
+            />
 
-            {/* New Show Modal */}
-            {showNewShowModal && selectedTourId && (
-                <div className="modal-overlay" onClick={() => setShowNewShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Add Show</h2>
-                            <button className="close-btn" onClick={() => setShowNewShowModal(false)}>×</button>
-                        </div>
-                        <form onSubmit={handleCreateShow}>
-                            <div className="form-group">
-                                <label className="form-label">City</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. Chicago - Metro"
-                                    value={newShow.name}
-                                    onChange={(e) => setNewShow({ ...newShow, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                {(() => {
-                                    const selectedTour = tours.find(tour => tour.id === selectedTourId);
-                                    // Convert dates to YYYY-MM-DD format for HTML5 date inputs
-                                    const minDate = selectedTour?.startDate ? selectedTour.startDate.split('T')[0] : '';
-                                    const maxDate = selectedTour?.endDate ? selectedTour.endDate.split('T')[0] : '';
+            <CreateShowModal
+                isOpen={showNewShowModal}
+                onClose={() => setShowNewShowModal(false)}
+                selectedTourId={selectedTourId}
+                tours={tours}
+                onShowCreated={handleShowCreated}
+            />
 
-                                    return (
-                                        <>
-                                            <label className="form-label">Date</label>
-                                            {selectedTour && (selectedTour.startDate || selectedTour.endDate) && (
-                                                <p style={{
-                                                    fontSize: '0.875rem',
-                                                    color: 'var(--text-secondary)',
-                                                    marginBottom: '0.5rem',
-                                                    padding: '0.5rem',
-                                                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                                                    borderRadius: '4px',
-                                                    border: '1px solid rgba(139, 92, 246, 0.2)'
-                                                }}>
-                                                    📅 Tour dates: {' '}
-                                                    {selectedTour.startDate && format(new Date(selectedTour.startDate), 'MMM d, yyyy')}
-                                                    {selectedTour.startDate && selectedTour.endDate && ' - '}
-                                                    {selectedTour.endDate && format(new Date(selectedTour.endDate), 'MMM d, yyyy')}
-                                                </p>
-                                            )}
-                                            <input
-                                                type="date"
-                                                className="form-input"
-                                                value={newShow.date}
-                                                onChange={(e) => setNewShow({ ...newShow, date: e.target.value })}
-                                                min={minDate}
-                                                max={maxDate}
-                                                required
-                                            />
-                                            {(!minDate && !maxDate) && (
-                                                <p style={{
-                                                    fontSize: '0.875rem',
-                                                    color: 'var(--text-secondary)',
-                                                    marginTop: '0.25rem'
-                                                }}>
-                                                    No date restrictions - this tour has no set date range
-                                                </p>
-                                            )}
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Venue</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. Metro Chicago"
-                                    value={newShow.venue}
-                                    onChange={(e) => setNewShow({ ...newShow, venue: e.target.value })}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowNewShowModal(false)}
-                                    disabled={submitting}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? 'Adding...' : 'Add Show'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <EditShowModal
+                isOpen={showEditShowModal}
+                onClose={() => setShowEditShowModal(false)}
+                show={editingShow}
+                selectedTourId={selectedTourId}
+                tours={tours}
+                onShowUpdated={handleShowUpdated}
+            />
 
-            {/* Edit Show Modal */}
-            {showEditShowModal && selectedTourId && editingShow && (
-                <div className="modal-overlay" onClick={() => setShowEditShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Edit Show</h2>
-                            <button className="close-btn" onClick={() => setShowEditShowModal(false)}>×</button>
-                        </div>
-                        <form onSubmit={handleUpdateShow}>
-                            <div className="form-group">
-                                <label className="form-label">City</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. Chicago - Metro"
-                                    value={editShow.name}
-                                    onChange={(e) => setEditShow({ ...editShow, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                {(() => {
-                                    const selectedTour = tours.find(tour => tour.id === selectedTourId);
-                                    // Convert dates to YYYY-MM-DD format for HTML5 date inputs
-                                    const minDate = selectedTour?.startDate ? selectedTour.startDate.split('T')[0] : '';
-                                    const maxDate = selectedTour?.endDate ? selectedTour.endDate.split('T')[0] : '';
+            <InviteSellerModal
+                isOpen={showInviteSellerModal}
+                onClose={() => setShowInviteSellerModal(false)}
+                onInvitationCreated={() => {
+                    // Optionally refresh data or show success message
+                }}
+            />
 
-                                    return (
-                                        <>
-                                            <label className="form-label">Date</label>
-                                            {selectedTour && (selectedTour.startDate || selectedTour.endDate) && (
-                                                <p style={{
-                                                    fontSize: '0.875rem',
-                                                    color: 'var(--text-secondary)',
-                                                    marginBottom: '0.5rem',
-                                                    padding: '0.5rem',
-                                                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                                                    borderRadius: '4px',
-                                                    border: '1px solid rgba(139, 92, 246, 0.2)'
-                                                }}>
-                                                    📅 Tour dates: {' '}
-                                                    {selectedTour.startDate && format(new Date(selectedTour.startDate), 'MMM d, yyyy')}
-                                                    {selectedTour.startDate && selectedTour.endDate && ' - '}
-                                                    {selectedTour.endDate && format(new Date(selectedTour.endDate), 'MMM d, yyyy')}
-                                                </p>
-                                            )}
-                                            <input
-                                                type="date"
-                                                className="form-input"
-                                                value={editShow.date}
-                                                onChange={(e) => setEditShow({ ...editShow, date: e.target.value })}
-                                                min={minDate}
-                                                max={maxDate}
-                                                required
-                                            />
-                                            {(!minDate && !maxDate) && (
-                                                <p style={{
-                                                    fontSize: '0.875rem',
-                                                    color: 'var(--text-secondary)',
-                                                    marginTop: '0.25rem'
-                                                }}>
-                                                    No date restrictions - this tour has no set date range
-                                                </p>
-                                            )}
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Venue</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. Metro Chicago"
-                                    value={editShow.venue}
-                                    onChange={(e) => setEditShow({ ...editShow, venue: e.target.value })}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowEditShowModal(false)}
-                                    disabled={submitting}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? 'Updating...' : 'Update Show'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <ManageAssignmentsModal
+                isOpen={showManageAssignmentsModal}
+                onClose={() => {
+                    setShowManageAssignmentsModal(false);
+                    setSelectedTourForAssignments(null);
+                }}
+                tourId={selectedTourForAssignments?.id || null}
+                tourName={selectedTourForAssignments?.name || null}
+            />
         </div>
     );
 }

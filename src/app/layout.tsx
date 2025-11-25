@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { Auth0Provider } from '@auth0/nextjs-auth0/client';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -36,8 +38,10 @@ export default function RootLayout({
         backgroundColor: '#0a0a0f',
         color: '#f0f0f5'
       }}>
-        {children}
-        <SpeedInsights />
+        <Auth0Provider>
+          {children}
+          <SpeedInsights />
+        </Auth0Provider>
       </body>
     </html>
   );

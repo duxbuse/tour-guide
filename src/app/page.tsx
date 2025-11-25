@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HomeActions from "@/components/HomeActions";
 
 export default function Home() {
   return (
@@ -12,21 +13,7 @@ export default function Home() {
           The ultimate tool for band tour managers. Track merchandise, manage inventory, and monitor sales across every show.
         </p>
 
-        <div className="home-actions">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a
-            href="/api/auth/login"
-            className="btn btn-primary"
-          >
-            Get Started
-          </a>
-          <Link
-            href="/dashboard"
-            className="btn btn-secondary"
-          >
-            View Demo
-          </Link>
-        </div>
+        <HomeActions />
 
         <div className="features-grid">
           <FeatureCard

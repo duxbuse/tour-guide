@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 import { apiCache, createCacheKey, TOURS_CACHE_TTL } from '@/lib/cache';
@@ -6,24 +7,15 @@ import { apiCache, createCacheKey, TOURS_CACHE_TTL } from '@/lib/cache';
 export async function GET(request: NextRequest) {
     const startTime = Date.now();
     console.log('🚀 Tours API: Starting request');
-    
+
     try {
         const authStart = Date.now();
         const session = await auth0.getSession();
         console.log(`⏱️ Tours API: Auth took ${Date.now() - authStart}ms`);
 
-        let auth0User = session?.user;
+        const auth0User = session?.user;
 
-        // Fallback to manager user for development
-        if (!auth0User) {
-            auth0User = {
-                sub: 'auth0|691f989d2bc713054fec2340',
-                email: 'manager@test.com',
-                name: 'Tour Manager',
-                picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
-            };
-        }
+
 
         if (!auth0User) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -34,14 +26,29 @@ export async function GET(request: NextRequest) {
         const user = await findOrCreateUser(auth0User);
         console.log(`⏱️ Tours API: User lookup took ${Date.now() - userStart}ms`);
 
+        // Check user role
+        const userRoles = ((auth0User['https://tour-guide.app/roles'] as string[]) || []).map(r => r.toLowerCase());
+        let isManager = userRoles.includes('manager');
+        let isSeller = userRoles.includes('seller');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+            isSeller = demoUserType === 'seller';
+        }
+
         // Check if client wants detailed data or just summary
         const { searchParams } = new URL(request.url);
         const includeShows = searchParams.get('includeShows') === 'true';
         const includeInventory = searchParams.get('includeInventory') === 'true';
 
-        // Create cache key based on requested data
-        const cacheKey = createCacheKey('tours', user.id, includeShows.toString(), includeInventory.toString());
-        
+        // Create cache key based on requested data and role
+        const cacheKey = createCacheKey('tours', user.id, includeShows.toString(), includeInventory.toString(), isSeller ? 'seller' : 'manager');
+
         // Check cache first
         const cacheStart = Date.now();
         const cachedResult = apiCache.get(cacheKey);
@@ -54,28 +61,71 @@ export async function GET(request: NextRequest) {
         // Skip the updateMany operation entirely for read requests - handle this in a background job or separate endpoint
         // This was causing significant delay
 
+        // For sellers, get their assigned show IDs first
+        let assignedShowIds: string[] = [];
+        if (isSeller) {
+            const assignments = await db.sellerAssignment.findMany({
+                where: { sellerId: user.id },
+                select: { showId: true },
+            });
+            assignedShowIds = assignments.map(a => a.showId);
+        }
+
         // Super fast basic query - just tours with counts (default case)
         if (!includeShows && !includeInventory) {
             // Most minimal query possible for fast loading
-            const tours = await db.tour.findMany({
-                where: { managerId: user.id },
-                select: {
-                    id: true,
-                    name: true,
-                    startDate: true,
-                    endDate: true,
-                    isActive: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    _count: {
-                        select: { shows: true, merchItems: true },
+            let tours;
+
+            if (isManager) {
+                tours = await db.tour.findMany({
+                    where: { managerId: user.id },
+                    select: {
+                        id: true,
+                        name: true,
+                        startDate: true,
+                        endDate: true,
+                        isActive: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        _count: {
+                            select: { shows: true, merchItems: true },
+                        },
                     },
-                },
-                orderBy: [
-                    { isActive: 'desc' },
-                    { updatedAt: 'desc' }
-                ],
-            });
+                    orderBy: [
+                        { isActive: 'desc' },
+                        { updatedAt: 'desc' }
+                    ],
+                });
+            } else {
+                // Sellers only see tours that have shows they're assigned to
+                tours = await db.tour.findMany({
+                    where: {
+                        shows: {
+                            some: {
+                                id: {
+                                    in: assignedShowIds,
+                                },
+                            },
+                        },
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        startDate: true,
+                        endDate: true,
+                        isActive: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        _count: {
+                            select: { shows: true, merchItems: true },
+                        },
+                    },
+                    orderBy: [
+                        { isActive: 'desc' },
+                        { updatedAt: 'desc' }
+                    ],
+                });
+            }
 
             // Cache the result for future requests
             apiCache.set(cacheKey, tours, TOURS_CACHE_TTL);
@@ -85,29 +135,84 @@ export async function GET(request: NextRequest) {
         // Optimized shows query - limit to essential fields only
         if (includeShows && !includeInventory) {
             const queryStart = Date.now();
-            const tours = await db.tour.findMany({
-                where: { managerId: user.id },
-                include: {
-                    shows: {
-                        orderBy: { date: 'asc' },
-                        select: {
-                            id: true,
-                            name: true,
-                            date: true,
-                            venue: true,
-                            ticketsSold: true,
-                            totalTickets: true
-                        }
+            let tours;
+
+            if (isManager) {
+                tours = await db.tour.findMany({
+                    where: { managerId: user.id },
+                    include: {
+                        shows: {
+                            orderBy: { date: 'asc' },
+                            select: {
+                                id: true,
+                                name: true,
+                                date: true,
+                                venue: true,
+                                ticketsSold: true,
+                                totalTickets: true,
+                                sellerAssignments: {
+                                    include: {
+                                        seller: {
+                                            select: {
+                                                id: true,
+                                                email: true,
+                                                name: true,
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        _count: {
+                            select: { shows: true, merchItems: true },
+                        },
                     },
-                    _count: {
-                        select: { shows: true, merchItems: true },
+                    orderBy: [
+                        { isActive: 'desc' },
+                        { updatedAt: 'desc' }
+                    ],
+                });
+            } else {
+                // Sellers see tours with assigned shows, and only their assigned shows
+                const toursWithAllShows = await db.tour.findMany({
+                    where: {
+                        shows: {
+                            some: {
+                                id: {
+                                    in: assignedShowIds,
+                                },
+                            },
+                        },
                     },
-                },
-                orderBy: [
-                    { isActive: 'desc' },
-                    { updatedAt: 'desc' }
-                ],
-            });
+                    include: {
+                        shows: {
+                            where: {
+                                id: {
+                                    in: assignedShowIds,
+                                },
+                            },
+                            orderBy: { date: 'asc' },
+                            select: {
+                                id: true,
+                                name: true,
+                                date: true,
+                                venue: true,
+                                ticketsSold: true,
+                                totalTickets: true
+                            }
+                        },
+                        _count: {
+                            select: { shows: true, merchItems: true },
+                        },
+                    },
+                    orderBy: [
+                        { isActive: 'desc' },
+                        { updatedAt: 'desc' }
+                    ],
+                });
+                tours = toursWithAllShows;
+            }
+
             console.log(`⏱️ Tours API: Shows query took ${Date.now() - queryStart}ms`);
 
             // Cache the result for future requests
@@ -186,7 +291,8 @@ export async function POST(request: NextRequest) {
                 email: 'manager@test.com',
                 name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 
@@ -248,11 +354,12 @@ export async function PUT(request: NextRequest) {
         // Fallback to demo user for development
         if (!auth0User) {
             auth0User = {
-                sub: 'demo-user',
-                email: 'demo@example.com',
-                name: 'Demo User',
+                sub: 'auth0|691f989d2bc713054fec2340',
+                email: 'manager@test.com',
+                name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 
@@ -328,11 +435,12 @@ export async function DELETE(request: NextRequest) {
         // Fallback to demo user for development
         if (!auth0User) {
             auth0User = {
-                sub: 'demo-user',
-                email: 'demo@example.com',
-                name: 'Demo User',
+                sub: 'auth0|691f989d2bc713054fec2340',
+                email: 'manager@test.com',
+                name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 

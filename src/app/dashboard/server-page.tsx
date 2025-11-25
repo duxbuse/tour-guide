@@ -76,7 +76,8 @@ export default async function ServerDashboard() {
         email: 'manager@test.com',
         name: 'Tour Manager',
         picture: 'https://github.com/shadcn.png',
-        'https://tour-guide.app/roles': ['Manager']
+        'https://tour-guide.app/roles': ['Manager'],
+        roles: ['Manager']
       };
     }
 
@@ -275,9 +276,9 @@ function StatCard({ label, value, desc, positive }: {
     <div className="stat-card">
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
-      <div style={{ 
-        color: positive === true ? '#10B981' : positive === false ? '#EF4444' : 'var(--text-secondary)', 
-        fontSize: '0.875rem' 
+      <div style={{
+        color: positive === true ? '#10B981' : positive === false ? '#EF4444' : 'var(--text-secondary)',
+        fontSize: '0.875rem'
       }}>
         {desc}
       </div>
@@ -289,12 +290,12 @@ function calculateStats(tours: Tour[], allInventoryRecords: InventoryRecord[]) {
   const totalSold = allInventoryRecords.reduce((sum, record) =>
     sum + (record.soldCount || 0), 0
   );
-  
+
   const totalRevenue = allInventoryRecords.reduce((sum, record) =>
     sum + ((record.soldCount || 0) * record.variant.price), 0
   );
 
-  const lowStockItems = allInventoryRecords.filter(record => 
+  const lowStockItems = allInventoryRecords.filter(record =>
     record.variant.quantity < 5
   ).length;
 
