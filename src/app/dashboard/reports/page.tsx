@@ -10,13 +10,13 @@ import { calculateShrinkage, getTourStats, getTopSellingItems } from '@/lib/repo
 import { exportTourReportCSV, exportTourReportExcel } from '@/lib/exporters';
 
 export default function ReportsPage() {
-    const { user, isLoading: userLoading } = useUser();
+    useUser(); // Auth check
     const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
-    const [showsLoading, setShowsLoading] = useState(false);
+    const [, setShowsLoading] = useState(false);
     const [isDemo, setIsDemo] = useState(false);
     const [demoType, setDemoType] = useState<'manager' | 'seller'>('manager');
 

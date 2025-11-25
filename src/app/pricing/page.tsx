@@ -153,7 +153,7 @@ export default function PricingPage() {
                         margin: '0 auto',
                         lineHeight: '1.75'
                     }}>
-                        Whether you're playing local clubs or selling out stadiums, we have the perfect toolkit for your merchandise operations.
+                        Whether you&apos;re playing local clubs or selling out stadiums, we have the perfect toolkit for your merchandise operations.
                     </p>
                 </div>
 

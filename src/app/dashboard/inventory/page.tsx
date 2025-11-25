@@ -12,7 +12,7 @@ import EditItemModal from '@/components/inventory/modals/EditItemModal';
 import InventoryShowSelectModal from '@/components/inventory/modals/InventoryShowSelectModal';
 
 export default function InventoryPage() {
-    const { user, isLoading: userLoading } = useUser();
+    const { user } = useUser();
     const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
