@@ -4,30 +4,13 @@ import { PrismaClient } from '@prisma/client';
 // exhausting your database connection limit.
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-console.log('🔍 Prisma Client initialization:');
-console.log('- NODE_ENV:', process.env.NODE_ENV);
-console.log('- DATABASE_URL exists:', !!process.env.DATABASE_URL);
-console.log('- DATABASE_URL type:', typeof process.env.DATABASE_URL);
-
-if (process.env.DATABASE_URL) {
-    const urlLength = process.env.DATABASE_URL.length;
-    const urlPrefix = process.env.DATABASE_URL.substring(0, 20);
-    const isValidPostgres = process.env.DATABASE_URL.startsWith('postgresql://');
-
-    console.log('- DATABASE_URL length:', urlLength);
-    console.log('- DATABASE_URL prefix:', urlPrefix);
-    console.log('- Is valid PostgreSQL URL:', isValidPostgres);
-}
-
 export const prisma = globalForPrisma.prisma || new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
 });
 
 if (process.env.NODE_ENV !== 'production') {
     globalForPrisma.prisma = prisma;
 }
-
-console.log('✅ Creating Prisma Client with optimized configuration');
 
 // Helper function to find or create user
 export async function findOrCreateUser(auth0User: {
@@ -63,10 +46,6 @@ export async function findOrCreateUser(auth0User: {
         const shouldBeManager = allUsers.length === 0 || nonTestUsers.length === 0;
         const defaultRole = shouldBeManager ? 'MANAGER' : 'SELLER';
 
-        console.log(`Creating new user: ${email}`);
-        console.log(`Total users: ${allUsers.length}, Non-test users: ${nonTestUsers.length}`);
-        console.log(`Assigning role: ${defaultRole}`);
-
         user = await prisma.user.create({
             data: {
                 auth0Id,
@@ -75,7 +54,8 @@ export async function findOrCreateUser(auth0User: {
                 role: defaultRole,
             }
         });
-        console.log('✅ User created:', user.id, 'with role:', user.role);
+
+        console.log(`✅ Created user: ${email} with ${defaultRole} role`);
     }
 
     return user;

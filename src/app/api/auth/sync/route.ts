@@ -28,12 +28,6 @@ export async function GET() {
             ? demoUserType.toUpperCase()
             : user.role;
 
-        console.log('🔐 Auth Sync Response:');
-        console.log('  User:', user.email);
-        console.log('  DB Role:', user.role);
-        console.log('  Final Role:', finalRole);
-        console.log('  Demo Mode:', isDemo);
-
         return NextResponse.json({
             success: true,
             user: {

@@ -46,7 +46,7 @@ export default function UserInfo({ user }: UserInfoProps) {
                 <span className="user-email">{displayEmail}</span>
             </div>
             <Image
-                src={displayPicture || '/logo-v2.svg'}
+                src={displayPicture || '/logo.svg'}
                 alt={displayName || 'User'}
                 width={32}
                 height={32}
