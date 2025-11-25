@@ -4,20 +4,25 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useUserRole } from '@/hooks/useUserRole';
+import { isDemoMode, getDemoUserType } from '@/lib/demo-mode';
 import { InventoryRecord, Tour } from '@/types/inventory';
 import { calculateShrinkage, getTourStats, getTopSellingItems } from '@/lib/reports';
 import { exportTourReportCSV, exportTourReportExcel } from '@/lib/exporters';
 
 export default function ReportsPage() {
-    const { user, isLoading: userLoading } = useUser();
+    useUser(); // Auth check
     const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
-    const [showsLoading, setShowsLoading] = useState(false);
+    const [, setShowsLoading] = useState(false);
+    const [isDemo, setIsDemo] = useState(false);
+    const [demoType, setDemoType] = useState<'manager' | 'seller'>('manager');
 
     useEffect(() => {
+        setIsDemo(isDemoMode());
+        setDemoType(getDemoUserType());
         fetchTours();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -29,8 +34,8 @@ export default function ReportsPage() {
         }
     }, [selectedTourId]);
 
-    // Check user role - Only managers can access reports
-    const isManager = role?.toLowerCase() === 'manager';
+    // Check user role - Only managers can access reports (or demo mode managers)
+    const isManager = (isDemo && demoType === 'manager') || role?.toLowerCase() === 'manager';
 
     const fetchTours = async () => {
         try {

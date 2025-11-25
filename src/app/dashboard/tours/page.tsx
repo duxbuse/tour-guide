@@ -40,7 +40,7 @@ interface Tour {
 }
 
 export default function ToursPage() {
-    const { user, isLoading: userLoading } = useUser();
+    useUser(); // Auth check
     const { role, isLoading: roleLoading } = useUserRole();
     const [tours, setTours] = useState<Tour[]>([]);
     const [loading, setLoading] = useState(true);
