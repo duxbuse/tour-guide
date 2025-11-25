@@ -54,8 +54,10 @@ export default function DashboardPage() {
     const [demoType, setDemoType] = useState<'manager' | 'seller'>('manager');
 
     useEffect(() => {
-        setIsDemo(isDemoMode());
-        setDemoType(getDemoUserType());
+        const demoMode = isDemoMode();
+        const userType = getDemoUserType();
+        setIsDemo(demoMode);
+        setDemoType(userType);
 
         const fetchData = async () => {
             try {
@@ -73,7 +75,8 @@ export default function DashboardPage() {
             }
         };
 
-        if (user && role) {
+        // Fetch data if user is authenticated OR in demo mode
+        if (demoMode || (user && role)) {
             fetchData();
         } else if (!userLoading && !roleLoading) {
             setDataLoading(false);
@@ -157,8 +160,8 @@ export default function DashboardPage() {
         };
     };
 
-    // Check user role - Managers and Sellers can access dashboard
-    const hasAccess = role && (role.toLowerCase() === 'manager' || role.toLowerCase() === 'seller');
+    // Check user role - Managers and Sellers can access dashboard, OR demo mode
+    const hasAccess = isDemo || (role && (role.toLowerCase() === 'manager' || role.toLowerCase() === 'seller'));
 
     if (userLoading || roleLoading || dataLoading) {
         return <DashboardSkeleton />;
