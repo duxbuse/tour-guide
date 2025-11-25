@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 
+interface Tour {
+    id: string;
+    name: string;
+    startDate: string | null;
+    endDate: string | null;
+    isActive?: boolean;
+    shows?: unknown[];
+}
+
 interface CreateTourModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onTourCreated: (tour: any) => void;
+    onTourCreated: (tour: Tour) => void;
 }
 
 export default function CreateTourModal({ isOpen, onClose, onTourCreated }: CreateTourModalProps) {

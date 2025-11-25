@@ -16,7 +16,8 @@ export async function GET(_request: NextRequest) {
                 email: 'manager@test.com',
                 name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 

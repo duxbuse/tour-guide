@@ -29,14 +29,16 @@ const DEMO_USERS = {
         email: 'manager@test.com',
         name: 'Tour Manager',
         picture: 'https://github.com/shadcn.png',
-        'https://tour-guide.app/roles': ['Manager']
+        'https://tour-guide.app/roles': ['Manager'],
+        roles: ['Manager']
     },
     seller: {
         sub: 'auth0|seller-user-id',
         email: 'seller@test.com',
         name: 'Tour Seller',
         picture: 'https://github.com/shadcn.png',
-        'https://tour-guide.app/roles': ['Seller']
+        'https://tour-guide.app/roles': ['Seller'],
+        roles: ['Seller']
     }
 };
 
@@ -56,7 +58,7 @@ export const auth0 = {
         // Real Auth0 session
         try {
             return await auth0Client.getSession();
-        } catch (error) {
+        } catch {
             // If getSession fails (e.g. not logged in), return null
             return null;
         }

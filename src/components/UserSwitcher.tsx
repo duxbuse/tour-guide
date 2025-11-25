@@ -6,14 +6,16 @@ import { setDemoUserType, getDemoUserType, isDemoMode } from '@/lib/demo-mode';
 export default function UserSwitcher() {
     const [isLoading, setIsLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [showSwitcher, setShowSwitcher] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
-        setShowSwitcher(isDemoMode());
     }, []);
 
-    if (!mounted || !showSwitcher) return null;
+    if (!mounted) return null;
+
+    const showSwitcher = isDemoMode();
+    if (!showSwitcher) return null;
 
     const currentUserType = getDemoUserType();
 

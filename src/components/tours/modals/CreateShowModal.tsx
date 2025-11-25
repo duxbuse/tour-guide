@@ -2,13 +2,20 @@
 
 import { useState } from 'react';
 
+interface Show {
+    id: string;
+    name: string;
+    date: string;
+    venue: string;
+}
+
 interface Tour {
     id: string;
     name: string;
     startDate: string | null;
     endDate: string | null;
     isActive: boolean;
-    shows: any[];
+    shows: Show[];
 }
 
 interface CreateShowModalProps {
@@ -16,7 +23,7 @@ interface CreateShowModalProps {
     onClose: () => void;
     selectedTourId: string | null;
     tours: Tour[];
-    onShowCreated: (show: any, tourId: string) => void;
+    onShowCreated: (show: Show, tourId: string) => void;
 }
 
 export default function CreateShowModal({ isOpen, onClose, selectedTourId, tours, onShowCreated }: CreateShowModalProps) {

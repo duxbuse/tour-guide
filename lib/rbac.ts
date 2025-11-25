@@ -6,7 +6,7 @@ import { auth0 } from './auth0';
  * @param auth0User - The Auth0 user object from session
  * @returns Object containing user and role check functions
  */
-export async function getUserWithRole(auth0User: any) {
+export async function getUserWithRole(auth0User: { sub: string } & Record<string, unknown>) {
     if (!auth0User?.sub) {
         return null;
     }

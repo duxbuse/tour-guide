@@ -16,17 +16,17 @@ interface UserInfoProps {
 }
 
 export default function UserInfo({ user }: UserInfoProps) {
-    const [isDemo, setIsDemo] = useState(false);
-    const [demoType, setDemoType] = useState<'manager' | 'seller'>('manager');
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setIsDemo(isDemoMode());
-        setDemoType(getDemoUserType());
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
     }, []);
 
     if (!mounted) return null;
+
+    const isDemo = isDemoMode();
+    const demoType = getDemoUserType();
 
     // If not logged in and not in demo mode, show login button
     if (!user && !isDemo) {

@@ -9,7 +9,7 @@ export default function PricingPage() {
                         Tour Guide Pricing
                     </h1>
                     <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-                        Choose the perfect plan for your band's journey. From local gigs to world tours, we've got you covered.
+                        Choose the perfect plan for your band&apos;s journey. From local gigs to world tours, we&apos;ve got you covered.
                     </p>
                 </div>
 

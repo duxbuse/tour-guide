@@ -7,8 +7,7 @@ interface ExportModalProps {
     selectedTourId: string | null;
     merchItems: MerchItem[];
     inventoryRecords: InventoryRecord[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    user: any;
+    user: { name?: string };
 }
 
 export default function ExportModal({
@@ -63,8 +62,6 @@ export default function ExportModal({
             ];
             rows.push(headers);
 
-            let grandTotalGross = 0;
-
             // Iterate categories
             Object.values(Category).forEach(category => {
                 const items = groupedItems[category];
@@ -72,8 +69,6 @@ export default function ExportModal({
 
                 // Category Header
                 rows.push([category, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
-
-                let categoryGross = 0;
 
                 items.forEach(item => {
                     item.variants.forEach(variant => {
@@ -90,7 +85,6 @@ export default function ExportModal({
                         const total = startCount + added;
 
                         const gross = sold * variant.price;
-                        categoryGross += gross;
 
                         rows.push([
                             item.name,
@@ -117,7 +111,6 @@ export default function ExportModal({
 
                 // Category Subtotal - use formula
                 rows.push(['Sub Total', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { f: `SUM(P${rows.length - items.reduce((sum, item) => sum + item.variants.length, 0) + 1}:P${rows.length})` }, '', '']);
-                grandTotalGross += categoryGross;
             });
 
             // Grand Total - use formula
@@ -235,7 +228,7 @@ export default function ExportModal({
 
                 // Category Header
                 const firstCell = rowValues[0];
-                if (Object.values(Category).includes(firstCell as any)) {
+                if (Object.values(Category).includes(firstCell as Category)) {
                     for (let C = range.s.c; C <= range.e.c; ++C) {
                         const cellAddress = xlsx.utils.encode_cell({ r: R, c: C });
                         if (!worksheet[cellAddress]) worksheet[cellAddress] = { t: 's', v: '' };

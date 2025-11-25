@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 
@@ -107,7 +108,16 @@ export async function POST(request: NextRequest) {
 
         // Check if user has manager role for creating items
         const userRoles = getUserRoles(auth0User);
-        const isManager = userRoles.includes('manager');
+        let isManager = userRoles.includes('manager');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+        }
 
         if (!isManager) {
             return NextResponse.json({ error: 'Access denied. Manager role required to create items.' }, { status: 403 });
@@ -183,7 +193,16 @@ export async function DELETE(request: NextRequest) {
 
         // Check if user has manager role for deleting items
         const userRoles = getUserRoles(auth0User);
-        const isManager = userRoles.includes('manager');
+        let isManager = userRoles.includes('manager');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+        }
 
         if (!isManager) {
             return NextResponse.json({ error: 'Access denied. Manager role required to delete items.' }, { status: 403 });
@@ -242,8 +261,18 @@ export async function PUT(request: NextRequest) {
 
         // Check if user has permission to edit quantities (manager or seller)
         const userRoles = getUserRoles(auth0User);
-        const isManager = userRoles.includes('manager');
-        const isSeller = userRoles.includes('seller');
+        let isManager = userRoles.includes('manager');
+        let isSeller = userRoles.includes('seller');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+            isSeller = demoUserType === 'seller';
+        }
 
         if (!isManager && !isSeller) {
             return NextResponse.json({ error: 'Access denied. Manager or Seller role required to edit quantities.' }, { status: 403 });

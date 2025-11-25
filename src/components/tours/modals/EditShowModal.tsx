@@ -24,7 +24,7 @@ interface EditShowModalProps {
     show: Show | null;
     selectedTourId: string | null;
     tours: Tour[];
-    onShowUpdated: (show: any, tourId: string) => void;
+    onShowUpdated: (show: Show, tourId: string) => void;
 }
 
 export default function EditShowModal({ isOpen, onClose, show, selectedTourId, tours, onShowUpdated }: EditShowModalProps) {

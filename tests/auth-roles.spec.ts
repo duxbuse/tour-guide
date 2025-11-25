@@ -101,6 +101,27 @@ test.describe('Manager User - Core RBAC Tests', () => {
         // Should NOT see access denied (wait up to 10 seconds)
         await expect(page.locator('text=Access Denied')).not.toBeVisible({ timeout: 10000 });
     });
+
+    test('Manager can access Inventory page', async ({ page }) => {
+        const managerEmail = process.env.AUTH0_MANAGER_EMAIL;
+        const managerPassword = process.env.AUTH0_MANAGER_PASSWORD;
+
+        if (!managerEmail || !managerPassword) {
+            test.skip();
+            return;
+        }
+
+        await login(page, managerEmail, managerPassword);
+
+        // Navigate to inventory
+        await page.goto(`${BASE_URL}/dashboard/inventory`);
+
+        // Should NOT see access denied
+        await expect(page.locator('text=Access Denied')).not.toBeVisible({ timeout: 10000 });
+
+        // Should be on inventory page
+        await expect(page).toHaveURL(/\/dashboard\/inventory/);
+    });
 });
 
 test.describe('Seller User - Core RBAC Tests', () => {
@@ -110,7 +131,7 @@ test.describe('Seller User - Core RBAC Tests', () => {
         const sellerEmail = process.env.AUTH0_SELLER_EMAIL;
         const sellerPassword = process.env.AUTH0_SELLER_PASSWORD;
 
-        if (!sellerEmail || !sellerEmail) {
+        if (!sellerEmail || !sellerPassword) {
             test.skip();
             return;
         }
@@ -185,6 +206,27 @@ test.describe('Seller User - Core RBAC Tests', () => {
 
         // Should be on tours page
         await expect(page).toHaveURL(/\/dashboard\/tours/);
+    });
+
+    test('Seller can access Inventory page', async ({ page }) => {
+        const sellerEmail = process.env.AUTH0_SELLER_EMAIL;
+        const sellerPassword = process.env.AUTH0_SELLER_PASSWORD;
+
+        if (!sellerEmail || !sellerPassword) {
+            test.skip();
+            return;
+        }
+
+        await login(page, sellerEmail, sellerPassword);
+
+        // Navigate to inventory
+        await page.goto(`${BASE_URL}/dashboard/inventory`);
+
+        // Should NOT see access denied
+        await expect(page.locator('text=Access Denied')).not.toBeVisible({ timeout: 10000 });
+
+        // Should be on inventory page
+        await expect(page).toHaveURL(/\/dashboard\/inventory/);
     });
 });
 

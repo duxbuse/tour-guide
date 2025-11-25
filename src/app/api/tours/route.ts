@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import db, { findOrCreateUser } from '@/lib/db';
 import { auth0 } from '@/lib/auth0';
 import { apiCache, createCacheKey, TOURS_CACHE_TTL } from '@/lib/cache';
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
         const session = await auth0.getSession();
         console.log(`⏱️ Tours API: Auth took ${Date.now() - authStart}ms`);
 
-        let auth0User = session?.user;
+        const auth0User = session?.user;
 
 
 
@@ -27,8 +28,18 @@ export async function GET(request: NextRequest) {
 
         // Check user role
         const userRoles = ((auth0User['https://tour-guide.app/roles'] as string[]) || []).map(r => r.toLowerCase());
-        const isManager = userRoles.includes('manager');
-        const isSeller = userRoles.includes('seller');
+        let isManager = userRoles.includes('manager');
+        let isSeller = userRoles.includes('seller');
+
+        // Check for demo mode override
+        const cookieStore = await cookies();
+        const isDemo = cookieStore.get('demo_mode')?.value === 'true';
+        const demoUserType = cookieStore.get('demo_user_type')?.value;
+
+        if (isDemo && demoUserType) {
+            isManager = demoUserType === 'manager';
+            isSeller = demoUserType === 'seller';
+        }
 
         // Check if client wants detailed data or just summary
         const { searchParams } = new URL(request.url);
@@ -280,7 +291,8 @@ export async function POST(request: NextRequest) {
                 email: 'manager@test.com',
                 name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 
@@ -342,11 +354,12 @@ export async function PUT(request: NextRequest) {
         // Fallback to demo user for development
         if (!auth0User) {
             auth0User = {
-                sub: 'demo-user',
-                email: 'demo@example.com',
-                name: 'Demo User',
+                sub: 'auth0|691f989d2bc713054fec2340',
+                email: 'manager@test.com',
+                name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 
@@ -422,11 +435,12 @@ export async function DELETE(request: NextRequest) {
         // Fallback to demo user for development
         if (!auth0User) {
             auth0User = {
-                sub: 'demo-user',
-                email: 'demo@example.com',
-                name: 'Demo User',
+                sub: 'auth0|691f989d2bc713054fec2340',
+                email: 'manager@test.com',
+                name: 'Tour Manager',
                 picture: 'https://github.com/shadcn.png',
-                'https://tour-guide.app/roles': ['Manager']
+                'https://tour-guide.app/roles': ['Manager'],
+                roles: ['Manager']
             };
         }
 

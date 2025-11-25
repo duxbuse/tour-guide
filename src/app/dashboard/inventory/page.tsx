@@ -474,7 +474,7 @@ export default function InventoryPage() {
                 selectedTourId={selectedTourId}
                 merchItems={merchItems}
                 inventoryRecords={inventoryRecords}
-                user={user}
+                user={user ?? { name: undefined }}
             />
         </div>
     );
