@@ -17,7 +17,10 @@ export function useUserRole() {
                 const response = await fetch('/api/auth/sync');
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('👤 useUserRole received:', data.user.role);
                     setRole(data.user.role);
+                } else {
+                    console.error('❌ Auth sync failed:', response.status);
                 }
             } catch (error) {
                 console.error('Error fetching user role:', error);
