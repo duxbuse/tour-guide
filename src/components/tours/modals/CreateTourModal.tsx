@@ -2,13 +2,24 @@
 
 import { useState } from 'react';
 
+interface Show {
+    id: string;
+    name: string;
+    date: string;
+    venue: string | null;
+}
+
 interface Tour {
     id: string;
     name: string;
     startDate: string | null;
     endDate: string | null;
-    isActive?: boolean;
-    shows?: unknown[];
+    isActive: boolean;
+    shows: Show[];
+    _count?: {
+        shows: number;
+        merchItems: number;
+    };
 }
 
 interface CreateTourModalProps {

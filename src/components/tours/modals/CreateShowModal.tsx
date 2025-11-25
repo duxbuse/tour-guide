@@ -6,7 +6,7 @@ interface Show {
     id: string;
     name: string;
     date: string;
-    venue: string;
+    venue: string | null;
 }
 
 interface Tour {
