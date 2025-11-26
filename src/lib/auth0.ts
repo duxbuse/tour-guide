@@ -8,8 +8,7 @@ function getAuth0Client(): Auth0Client {
     if (!_auth0Client) {
         console.log('Initializing Auth0Client...');
 
-        // On Vercel, let Auth0 SDK auto-detect the URL from request headers
-        // VERCEL_URL is only available at build time, not runtime
+        // Detect environment
         const isVercel = process.env.VERCEL === '1';
 
         let config: any = {
@@ -31,14 +30,29 @@ function getAuth0Client(): Auth0Client {
             }
         };
 
-        // Only set appBaseUrl for local development
-        if (!isVercel) {
-            const baseUrl = process.env.AUTH0_BASE_URL || 'https://localhost:3000';
-            config.appBaseUrl = baseUrl;
-            console.log('Auth0 Base URL (local):', baseUrl);
+        // Determine base URL based on environment
+        let baseUrl: string;
+        if (isVercel) {
+            // On Vercel:
+            // - VERCEL_URL is available at build AND runtime (contains the deployment URL)
+            // - For production: use AUTH0_BASE_URL if set, otherwise VERCEL_URL
+            // - For preview/branch: automatically uses VERCEL_URL
+            if (process.env.AUTH0_BASE_URL) {
+                baseUrl = process.env.AUTH0_BASE_URL;
+                console.log('Auth0 Base URL (Vercel - production):', baseUrl);
+            } else if (process.env.VERCEL_URL) {
+                baseUrl = `https://${process.env.VERCEL_URL}`;
+                console.log('Auth0 Base URL (Vercel - preview):', baseUrl);
+            } else {
+                throw new Error('Neither AUTH0_BASE_URL nor VERCEL_URL is set on Vercel');
+            }
         } else {
-            console.log('Auth0 running on Vercel - auto-detecting URL from request');
+            // Local development
+            baseUrl = process.env.AUTH0_BASE_URL || 'https://localhost:3000';
+            console.log('Auth0 Base URL (local):', baseUrl);
         }
+
+        config.appBaseUrl = baseUrl;
 
         _auth0Client = new Auth0Client(config);
         console.log('Auth0Client initialized successfully');
