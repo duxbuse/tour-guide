@@ -7,11 +7,31 @@ let _auth0Client: Auth0Client | null = null;
 function getAuth0Client(): Auth0Client {
     if (!_auth0Client) {
         console.log('Initializing Auth0Client...');
-        const baseUrl = process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : process.env.AUTH0_BASE_URL || 'http://localhost:3000';
 
-        console.log('Auth0 Base URL:', baseUrl);
+        // Robust base URL detection for Vercel and other environments
+        let baseUrl = '';
+
+        // Try multiple Vercel URL sources
+        if (process.env.VERCEL_URL) {
+            baseUrl = `https://${process.env.VERCEL_URL}`;
+        } else if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+            baseUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
+        } else if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+            baseUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+        } else if (process.env.AUTH0_BASE_URL) {
+            baseUrl = process.env.AUTH0_BASE_URL;
+        } else {
+            baseUrl = 'https://localhost:3000';
+        }
+
+        // Validate and normalize URL
+        try {
+            const url = new URL(baseUrl);
+            baseUrl = url.origin; // Ensure we only use the origin (protocol + host)
+        } catch (error) {
+            console.error('Invalid base URL:', baseUrl, error);
+            baseUrl = 'http://localhost:3000'; // Fallback
+        }
 
         console.log('Auth0 Base URL:', baseUrl);
 
