@@ -1,66 +1,93 @@
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
+import { cookies } from 'next/headers';
 
-// Dynamically construct the base URL for the application
-// This supports Vercel preview deployments, PR deployments, and production
-const getBaseUrl = (): string => {
-    // For Vercel deployments (including preview/PR deployments)
-    if (process.env.VERCEL_URL) {
-        return `https://${process.env.VERCEL_URL}`;
-    }
-
-    // Alternative Vercel URL (public-facing)
-    if (process.env.NEXT_PUBLIC_VERCEL_URL) {
-        return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
-    }
-
-    // Explicit base URL (for production or custom domains)
-    if (process.env.AUTH0_BASE_URL) {
-        return process.env.AUTH0_BASE_URL;
-    }
-
-    // Fallback for local development
-    return 'http://localhost:3000';
-};
-
-// Validate required environment variables (skip during build)
-const validateEnvVars = () => {
-    if (!process.env.AUTH0_SECRET) {
-        throw new Error('AUTH0_SECRET is required');
-    }
-
-    if (!process.env.AUTH0_ISSUER_BASE_URL) {
-        throw new Error('AUTH0_ISSUER_BASE_URL is required');
-    }
-
-    if (!process.env.AUTH0_CLIENT_ID) {
-        throw new Error('AUTH0_CLIENT_ID is required');
-    }
-
-    if (!process.env.AUTH0_CLIENT_SECRET) {
-        throw new Error('AUTH0_CLIENT_SECRET is required');
-    }
-};
-
-// Lazy initialization - client is created at runtime, not build time
+// Lazy initialization - client is created at runtime when BASE_URL is available
 let _auth0Client: Auth0Client | null = null;
 
-const getAuth0Client = (): Auth0Client => {
+function getAuth0Client(): Auth0Client {
     if (!_auth0Client) {
-        validateEnvVars();
+        console.log('Initializing Auth0Client...');
+        const baseUrl = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : process.env.AUTH0_BASE_URL || 'http://localhost:3000';
+
+        console.log('Auth0 Base URL:', baseUrl);
+
+        console.log('Auth0 Base URL:', baseUrl);
+
         _auth0Client = new Auth0Client({
-            appBaseUrl: getBaseUrl(),
+            appBaseUrl: baseUrl,
+            routes: {
+                login: '/api/auth/login',
+                logout: '/api/auth/logout',
+                callback: '/api/auth/callback'
+            },
+            signInReturnToPath: '/dashboard',
+            session: {
+                cookie: {
+                    secure: true,
+                    sameSite: 'lax'
+                }
+            },
+            transactionCookie: {
+                secure: true,
+                sameSite: 'lax'
+            }
         });
+        console.log('Auth0Client initialized successfully');
     }
     return _auth0Client;
-};
+}
 
-// Export a getter that creates the client on first access
+// Export client with lazy getter
 export const auth0Client = new Proxy({} as Auth0Client, {
-    get(target, prop) {
+    get(_, prop) {
         const client = getAuth0Client();
-        const value = (client as any)[prop];
+        const value = (client as any)[prop]; // eslint-disable-line @typescript-eslint/no-explicit-any
         return typeof value === 'function' ? value.bind(client) : value;
     }
 });
 
-export const auth0 = auth0Client;
+// Mock users for demo mode
+const DEMO_USERS = {
+    manager: {
+        sub: 'auth0|691f989d2bc713054fec2340',
+        email: 'manager@test.com',
+        name: 'Tour Manager',
+        picture: 'https://github.com/shadcn.png',
+        'https://tour-guide.app/roles': ['Manager'],
+        roles: ['Manager']
+    },
+    seller: {
+        sub: 'auth0|seller-user-id',
+        email: 'seller@test.com',
+        name: 'Tour Seller',
+        picture: 'https://github.com/shadcn.png',
+        'https://tour-guide.app/roles': ['Seller'],
+        roles: ['Seller']
+    }
+};
+
+// Export auth wrapper with demo mode support
+export const auth0 = {
+    getSession: async () => {
+        // Check for demo mode cookie
+        const cookieStore = await cookies();
+        const isDemoMode = cookieStore.get('demo_mode')?.value === 'true';
+
+        if (isDemoMode) {
+            const userType = (cookieStore.get('demo_user_type')?.value as 'manager' | 'seller') || 'manager';
+            return {
+                user: DEMO_USERS[userType]
+            };
+        }
+
+        // Real Auth0 session
+        try {
+            return await auth0Client.getSession();
+        } catch {
+            // If getSession fails (e.g. not logged in), return null
+            return null;
+        }
+    }
+};
