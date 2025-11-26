@@ -1,42 +1,18 @@
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
 import { cookies } from 'next/headers';
 
-// Lazy initialization - client is created at runtime when BASE_URL is available
+// Lazy initialization - client is created at runtime
 let _auth0Client: Auth0Client | null = null;
 
 function getAuth0Client(): Auth0Client {
     if (!_auth0Client) {
         console.log('Initializing Auth0Client...');
 
-        // Robust base URL detection for Vercel and other environments
-        let baseUrl = '';
+        // On Vercel, let Auth0 SDK auto-detect the URL from request headers
+        // VERCEL_URL is only available at build time, not runtime
+        const isVercel = process.env.VERCEL === '1';
 
-        // Try multiple Vercel URL sources
-        if (process.env.VERCEL_URL) {
-            baseUrl = `https://${process.env.VERCEL_URL}`;
-        } else if (process.env.NEXT_PUBLIC_VERCEL_URL) {
-            baseUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
-        } else if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-            baseUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-        } else if (process.env.AUTH0_BASE_URL) {
-            baseUrl = process.env.AUTH0_BASE_URL;
-        } else {
-            baseUrl = 'https://localhost:3000';
-        }
-
-        // Validate and normalize URL
-        try {
-            const url = new URL(baseUrl);
-            baseUrl = url.origin; // Ensure we only use the origin (protocol + host)
-        } catch (error) {
-            console.error('Invalid base URL:', baseUrl, error);
-            baseUrl = 'http://localhost:3000'; // Fallback
-        }
-
-        console.log('Auth0 Base URL:', baseUrl);
-
-        _auth0Client = new Auth0Client({
-            appBaseUrl: baseUrl,
+        let config: any = {
             routes: {
                 login: '/api/auth/login',
                 logout: '/api/auth/logout',
@@ -53,7 +29,18 @@ function getAuth0Client(): Auth0Client {
                 secure: true,
                 sameSite: 'lax'
             }
-        });
+        };
+
+        // Only set appBaseUrl for local development
+        if (!isVercel) {
+            const baseUrl = process.env.AUTH0_BASE_URL || 'https://localhost:3000';
+            config.appBaseUrl = baseUrl;
+            console.log('Auth0 Base URL (local):', baseUrl);
+        } else {
+            console.log('Auth0 running on Vercel - auto-detecting URL from request');
+        }
+
+        _auth0Client = new Auth0Client(config);
         console.log('Auth0Client initialized successfully');
     }
     return _auth0Client;
